@@ -1,7 +1,9 @@
 package io.github.trvladislav.terminal.core;
+
 /**
  * Utility class for packing terminal cell data into a single 64-bit long.
- * * Memory layout:
+ *
+ * Memory layout:
  * [0..23]  - Character (Unicode Code Point)
  * [24..31] - Foreground Color (0-255)
  * [32..39] - Background Color (0-255)
@@ -10,11 +12,19 @@ package io.github.trvladislav.terminal.core;
  */
 public final class CellUtils {
 
+    // Bit layout constants
+    private static final int CHAR_BITS = 24;
+    private static final long CHAR_MASK = (1L << CHAR_BITS) - 1;
+    private static final int FG_SHIFT = 24;
+    private static final int BG_SHIFT = 32;
+    private static final int STYLE_SHIFT = 40;
+    private static final long BYTE_MASK = 0xFFL;
+
     // Style bitmasks
     public static final int STYLE_NONE = 0;
-    public static final int STYLE_BOLD = 1;      // 0001
-    public static final int STYLE_ITALIC = 2;    // 0010
-    public static final int STYLE_UNDERLINE = 4; // 0100
+    public static final int STYLE_BOLD = 1;
+    public static final int STYLE_ITALIC = 2;
+    public static final int STYLE_UNDERLINE = 4;
 
     private CellUtils() {
     }
@@ -23,14 +33,14 @@ public final class CellUtils {
      * Packs cell properties into a single long.
      */
     public static long encode(int character, int fgColor, int bgColor, int styles) {
-        return (character & 0xFFFFFFL) |
-                ((fgColor & 0xFFL) << 24) |
-                ((bgColor & 0xFFL) << 32) |
-                ((styles & 0xFFL) << 40);
+        return (character & CHAR_MASK) |
+                ((fgColor & BYTE_MASK) << FG_SHIFT) |
+                ((bgColor & BYTE_MASK) << BG_SHIFT) |
+                ((styles & BYTE_MASK) << STYLE_SHIFT);
     }
 
     /**
-     * Returns an empty space cell with default colors (e.g., FG: 7, BG: 0).
+     * Returns an empty space cell with default colors (FG: 7, BG: 0).
      */
     public static long createEmpty() {
         return encode(' ', 7, 0, STYLE_NONE);
@@ -39,19 +49,19 @@ public final class CellUtils {
     // --- Decoders ---
 
     public static int getCharacter(long cell) {
-        return (int) (cell & 0xFFFFFFL);
+        return (int) (cell & CHAR_MASK);
     }
 
     public static int getForegroundColor(long cell) {
-        return (int) ((cell >>> 24) & 0xFFL);
+        return (int) ((cell >>> FG_SHIFT) & BYTE_MASK);
     }
 
     public static int getBackgroundColor(long cell) {
-        return (int) ((cell >>> 32) & 0xFFL);
+        return (int) ((cell >>> BG_SHIFT) & BYTE_MASK);
     }
 
     public static int getStyles(long cell) {
-        return (int) ((cell >>> 40) & 0xFFL);
+        return (int) ((cell >>> STYLE_SHIFT) & BYTE_MASK);
     }
 
     // --- Style Checkers ---
@@ -74,7 +84,27 @@ public final class CellUtils {
      * Replaces the character bits while preserving colors and styles.
      */
     public static long setCharacter(long cell, int newCharacter) {
-        // ~0xFFFFFFL masks out the old character bits
-        return (cell & ~0xFFFFFFL) | (newCharacter & 0xFFFFFFL);
+        return (cell & ~CHAR_MASK) | (newCharacter & CHAR_MASK);
+    }
+
+    /**
+     * Replaces the foreground color while preserving other fields.
+     */
+    public static long setForegroundColor(long cell, int newFgColor) {
+        return (cell & ~(BYTE_MASK << FG_SHIFT)) | ((newFgColor & BYTE_MASK) << FG_SHIFT);
+    }
+
+    /**
+     * Replaces the background color while preserving other fields.
+     */
+    public static long setBackgroundColor(long cell, int newBgColor) {
+        return (cell & ~(BYTE_MASK << BG_SHIFT)) | ((newBgColor & BYTE_MASK) << BG_SHIFT);
+    }
+
+    /**
+     * Replaces the style flags while preserving other fields.
+     */
+    public static long setStyles(long cell, int newStyles) {
+        return (cell & ~(BYTE_MASK << STYLE_SHIFT)) | ((newStyles & BYTE_MASK) << STYLE_SHIFT);
     }
 }
