@@ -60,4 +60,15 @@ public class RingBuffer {
     public boolean isFull() {
         return size == capacity;
     }
+
+    /**
+     * Removes all elements from the buffer.
+     */
+    public void clear() {
+        for (int i = 0; i < capacity; i++) {
+            buffer[i] = null;
+        }
+        head = 0;
+        size = 0;
+    }
 }

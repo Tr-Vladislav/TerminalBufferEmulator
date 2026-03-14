@@ -20,6 +20,11 @@ public final class CellUtils {
     private static final int STYLE_SHIFT = 40;
     private static final long BYTE_MASK = 0xFFL;
 
+    // Default attribute values
+    public static final int DEFAULT_FG = 7;
+    public static final int DEFAULT_BG = 0;
+    public static final int DEFAULT_STYLES = 0;
+
     // Style bitmasks
     public static final int STYLE_NONE = 0;
     public static final int STYLE_BOLD = 1;
@@ -43,7 +48,7 @@ public final class CellUtils {
      * Returns an empty space cell with default colors (FG: 7, BG: 0).
      */
     public static long createEmpty() {
-        return encode(' ', 7, 0, STYLE_NONE);
+        return encode(' ', DEFAULT_FG, DEFAULT_BG, DEFAULT_STYLES);
     }
 
     // --- Decoders ---
