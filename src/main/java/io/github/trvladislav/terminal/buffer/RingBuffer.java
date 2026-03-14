@@ -1,6 +1,6 @@
-package io.github.trvladislav.terminal.core;
+package io.github.trvladislav.terminal.buffer;
 
-public class RingBuffer {
+class RingBuffer {
 
     private final BufferLine[] buffer;
     private final int capacity;
@@ -11,7 +11,7 @@ public class RingBuffer {
     // Current number of elements in the buffer
     private int size;
 
-    public RingBuffer(int capacity) {
+    RingBuffer(int capacity) {
         if (capacity <= 0) {
             throw new IllegalArgumentException("Capacity must be greater than 0");
         }

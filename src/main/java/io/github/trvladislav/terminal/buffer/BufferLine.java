@@ -1,4 +1,4 @@
-package io.github.trvladislav.terminal.core;
+package io.github.trvladislav.terminal.buffer;
 
 /**
  * Abstraction for a single line in a terminal buffer.

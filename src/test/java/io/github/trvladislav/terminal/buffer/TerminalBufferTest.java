@@ -1,5 +1,6 @@
-package io.github.trvladislav.terminal.core;
+package io.github.trvladislav.terminal.buffer;
 
+import io.github.trvladislav.terminal.cell.CellUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;

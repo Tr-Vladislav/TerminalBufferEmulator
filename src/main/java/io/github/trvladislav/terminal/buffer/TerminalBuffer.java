@@ -1,4 +1,7 @@
-package io.github.trvladislav.terminal.core;
+package io.github.trvladislav.terminal.buffer;
+
+import io.github.trvladislav.terminal.cell.CellUtils;
+import io.github.trvladislav.terminal.cursor.Cursor;
 
 /**
  * The main facade that ties together the screen grid, scrollback history,

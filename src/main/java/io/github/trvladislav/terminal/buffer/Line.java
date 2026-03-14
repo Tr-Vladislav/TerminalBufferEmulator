@@ -1,4 +1,6 @@
-package io.github.trvladislav.terminal.core;
+package io.github.trvladislav.terminal.buffer;
+
+import io.github.trvladislav.terminal.cell.CellUtils;
 
 import java.util.Arrays;
 
@@ -6,7 +8,7 @@ public class Line implements BufferLine {
     private final long[] cells;
     private final int width;
 
-    public Line(int width) {
+    Line(int width) {
         this.width = width;
         this.cells = new long[width];
         Arrays.fill(cells, CellUtils.createEmpty());

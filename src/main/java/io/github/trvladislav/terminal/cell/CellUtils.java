@@ -1,4 +1,4 @@
-package io.github.trvladislav.terminal.core;
+package io.github.trvladislav.terminal.cell;
 
 /**
  * Utility class for packing terminal cell data into a single 64-bit long.

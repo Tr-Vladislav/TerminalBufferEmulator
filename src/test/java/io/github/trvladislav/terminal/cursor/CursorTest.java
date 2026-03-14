@@ -1,4 +1,4 @@
-package io.github.trvladislav.terminal.core;
+package io.github.trvladislav.terminal.cursor;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

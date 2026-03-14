@@ -1,4 +1,4 @@
-package io.github.trvladislav.terminal.core;
+package io.github.trvladislav.terminal.cursor;
 
 /**
  * Tracks the cursor position within the visible screen area.

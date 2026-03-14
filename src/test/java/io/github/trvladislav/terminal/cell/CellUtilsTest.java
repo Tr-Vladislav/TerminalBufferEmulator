@@ -1,4 +1,4 @@
-package io.github.trvladislav.terminal.core;
+package io.github.trvladislav.terminal.cell;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
