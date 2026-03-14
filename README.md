@@ -1,88 +1,167 @@
-Task:
-Implement a terminal text buffer — the core data structure that terminal emulators use to store and manipulate displayed text.
+# Terminal Buffer Emulator
 
-When a shell sends output, the terminal emulator updates this buffer, and the UI renders it.
+A terminal text buffer implementation in Java — the core data structure that terminal emulators use to store and manipulate displayed text.
 
-A terminal buffer consists of a grid of character cells. Each cell can have:
-- Character (or empty)
-- Foreground color: default, or one of 16 standard terminal colors
-- Background color: default, or one of 16 standard terminal colors
-- Style flags: bold, italic, underline (at minimum)
+When a shell sends output, the terminal emulator updates this buffer, and a UI layer renders it. This project implements the buffer layer with no external dependencies (JUnit 5 for testing only).
 
-The buffer maintains a cursor position — where the next character will be written.
+## Architecture
 
-The buffer has two logical parts:
-- Screen — the last N lines that fit the screen dimensions (e.g., 80×24). This is the editable part and what users see.
-- Scrollback — lines that scrolled off the top of the screen, preserved for history and unmodifiable. Users can scroll up to view them.
+The project is organized into three packages with a clear one-way dependency flow:
 
-Terminal buffer requirements
+```
+io.github.trvladislav.terminal
+├── buffer    TerminalBuffer (facade), BufferLine, Line, RingBuffer
+├── cell      CellUtils (bit-packed cell encoding/decoding)
+└── cursor    Cursor (position tracking with bounds clamping)
+```
 
-Basic operations
+`buffer` depends on `cell` and `cursor`. `cell` and `cursor` are independent of each other. No circular dependencies.
 
-Implement a TerminalBuffer class (or equivalent) supporting the following operations:
+### Key Components
 
-Setup
-- Configurable initial width and height
-- Configurable scrollback maximum size (number of lines)
+| Class | Visibility | Role |
+|-------|-----------|------|
+| `TerminalBuffer` | public | Main facade — the only class most consumers need |
+| `BufferLine` | public (interface) | Abstraction for a single line, returned from accessors |
+| `Line` | public (pkg-private constructor) | Dense `long[]` implementation of `BufferLine` |
+| `RingBuffer` | package-private | Internal circular buffer for scrollback history |
+| `CellUtils` | public | Bit-level cell encoding: character + colors + styles in a single `long` |
+| `Cursor` | public | Cursor position tracker, clamped to screen bounds |
 
-Attributes
-- Set current attributes: foreground, background and styles. These attributes should be used for further edits.
+## Cell Encoding: Packing into a Primitive `long`
 
-Cursor
-- Get/set cursor position (column, row)
-- Move cursor: up, down, left, right by N cells
-- Cursor must not move outside screen bounds
+Each terminal cell (character + foreground color + background color + style flags) is packed into a single **64-bit `long`** value. This avoids object allocation per cell — an 80x24 screen is just a flat `long[1920]` array with zero GC pressure.
 
-Editing
+### Memory Layout
 
-Operations that should take the current cursor position and attributes into account:
+```
+Bit:  63        48 47      40 39      32 31      24 23             0
+      ┌──────────┬──────────┬──────────┬──────────┬─────────────────┐
+      │ Reserved │  Styles  │ BG Color │ FG Color │   Character     │
+      │ (16 bit) │  (8 bit) │  (8 bit) │  (8 bit) │  (24 bit)      │
+      └──────────┴──────────┴──────────┴──────────┴─────────────────┘
+```
 
-- Write a text on a line, overriding the current content. Moves the cursor.
-- Insert a text on a line, possibly wrapping the line. Moves the cursor.
-- Fill a line with a character (or empty)
+| Field | Bits | Range | Description |
+|-------|------|-------|-------------|
+| Character | 0..23 | 0 — 16,777,215 | Unicode code point (covers full BMP + supplementary planes, including emoji) |
+| Foreground | 24..31 | 0 — 255 | 8-bit color index (16 standard + 240 extended) |
+| Background | 32..39 | 0 — 255 | 8-bit color index |
+| Styles | 40..47 | bitmask | Bold (bit 0), Italic (bit 1), Underline (bit 2) |
+| Reserved | 48..63 | — | Available for wide-char flags, hyperlinks, etc. |
 
-Operations that do not depend on cursor position or attributes:
-- Insert an empty line at the bottom of the screen
-- Clear the entire screen
-- Clear the screen and scrollback
+### Why a Primitive `long`?
 
-Content Access
-- Get character at position (from screen and scrollback)
-- Get attributes at position (from screen and scrollback)
-- Get line as string (from screen and scrollback)
-- Get entire screen content as string
-- Get entire screen+scrollback content as string
+- **No heap allocation per cell.** A `Cell` object would cost 16+ bytes of object header alone. A `long` is 8 bytes, stored inline in the array.
+- **Cache-friendly.** A `long[]` is a contiguous block of memory. Iterating over cells to render a screen line hits sequential memory — ideal for CPU caches.
+- **Fast encoding/decoding.** All operations are bitwise AND, OR, and shifts — single-cycle CPU instructions. No method dispatch, no field access overhead.
 
+### Trade-offs
 
-Bonus
+- 8-bit color limits to 256 colors. Modern terminals support 24-bit true color (RGB). The 16 reserved bits (48..63) could be repurposed for this in a future version.
+- Reading individual fields requires calling `CellUtils.getCharacter(cell)` etc., which is less readable than `cell.character`. This is the cost of avoiding object allocation.
 
-If you complete the core requirements and want an extra challenge:
+## Manual Ring Buffer for Scrollback
 
-- Wide characters: Some characters (e.g., CJK ideographs, emoji) occupy 2 cells in terminals. Handle writing and cursor movement for such characters.
-- Resize: change the dimensions of the screen (content handling strategy is your design decision)
+Scrollback history is stored in a **manually implemented circular buffer** (`RingBuffer`). When the screen scrolls, the top line is pushed into the ring buffer. Once the buffer reaches its configured capacity, the oldest line is silently overwritten.
 
-Technical Constraints
+### How It Works
 
-- Language: Java or Kotlin
-- No external libraries except for testing (any test framework is allowed)
-- Build tool: Gradle or Maven
+```
+Capacity = 4, after pushing lines A, B, C, D, E:
 
-Expected results
+Physical array:  [ E | B | C | D ]
+                   ^
+                   head (oldest = B)
 
-Explain the solution, trade-offs and decisions you made before submitting the task.
-If you have any improvements in your mind but didn't have time to implement them, mention them as well.
+Logical view:    [0]=B  [1]=C  [2]=D  [3]=E
+```
 
-Attach a link to a public Git repository (GitHub, GitLab, etc.).
-The repository should contain:
+- `head` points to the oldest element
+- `size` tracks how many slots are occupied (up to `capacity`)
+- `push()` writes to `(head + size) % capacity` and advances `head` when full
+- `get(i)` translates logical index to physical: `(head + i) % capacity`
 
-Source code
+### Why Not `ArrayDeque` or `LinkedList`?
 
-Build file that compiles
+- **`ArrayDeque`** doesn't support indexed access (`get(i)`). Scrollback requires random access to render any visible portion of history.
+- **`LinkedList`** has O(n) indexed access and heavy per-node allocation.
+- **`ArrayList`** with manual removal at index 0 is O(n) per scroll — the ring buffer is O(1).
+- A manual ring buffer gives O(1) push and O(1) random access with zero allocation after initialization.
 
-Unit Tests:
+## Features
 
-Comprehensive test coverage
+### Attributes
+- Set foreground color, background color, and style flags (bold, italic, underline)
+- Individual setters and reset-to-default for each attribute
+- Attributes are applied to all subsequent write/insert operations
 
-Edge cases and boundary conditions
+### Cursor
+- Absolute positioning with `setCursorPosition(column, row)`
+- Relative movement: `moveCursorUp/Down/Left/Right(n)`
+- All positions are clamped to screen bounds — cursor never leaves the visible area
 
-Tests should document expected behavior
+### Editing
+- **Write text** — overwrites at cursor position, wraps at line end, scrolls at screen bottom
+- **Insert text** — shifts existing content right (last character falls off), wraps and scrolls
+- **Fill line** — fills the current row with a character using current attributes
+- **Insert line at bottom** — scrolls screen up, top line moves to scrollback
+- **Clear screen** — resets all screen lines, preserves scrollback
+- **Clear all** — resets screen and scrollback
+
+### Content Access
+- Get character or full cell data at any screen/scrollback position
+- Get any line as a string
+- Get entire screen or full content (scrollback + screen) as a multi-line string
+
+## Building and Running
+
+### Prerequisites
+- Java 25
+- Maven 3.x
+
+### Build and Test
+```bash
+mvn clean test
+```
+
+### Run Demo UI
+```bash
+mvn compile exec:java -Dexec.mainClass="io.github.trvladislav.terminal.Main"
+```
+
+The demo opens a Swing window with an 80x24 terminal grid. Type to write, use arrow keys to move, Enter for new lines, Backspace to delete.
+
+## Project Structure
+
+```
+src/
+├── main/java/io/github/trvladislav/terminal/
+│   ├── Main.java                          Swing demo application
+│   ├── buffer/
+│   │   ├── TerminalBuffer.java            Main facade
+│   │   ├── BufferLine.java                Line interface
+│   │   ├── Line.java                      Dense long[] line implementation
+│   │   └── RingBuffer.java                Circular buffer (package-private)
+│   ├── cell/
+│   │   └── CellUtils.java                 Cell bit-packing utilities
+│   └── cursor/
+│       └── Cursor.java                    Cursor position tracker
+└── test/java/io/github/trvladislav/terminal/
+    ├── buffer/
+    │   ├── TerminalBufferTest.java         34 tests
+    │   ├── LineTest.java                   8 tests
+    │   └── RingBufferTest.java             7 tests
+    ├── cell/
+    │   └── CellUtilsTest.java             9 tests
+    └── cursor/
+        └── CursorTest.java                14 tests
+```
+
+## Possible Improvements
+
+- **24-bit true color** — expand the cell layout to support RGB foreground/background using the 16 reserved bits
+- **Wide character support** — CJK characters and emoji that occupy 2 cells, using a reserved bit as a wide-char flag
+- **Screen resize** — reflow or truncate lines when dimensions change
+- **Sparse line implementation** — alternative `BufferLine` that stores only non-empty cells, efficient for mostly-blank screens
+- **`Cell` record** — a read-only `record Cell(int character, int fg, int bg, int styles)` for the public API, keeping the raw `long` for internal performance paths
