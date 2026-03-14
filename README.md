@@ -118,16 +118,16 @@ Logical view:    [0]=B  [1]=C  [2]=D  [3]=E
 
 ### Prerequisites
 - Java 25
-- Maven 3.x
+- Maven wrapper is included — no separate Maven installation required
 
 ### Build and Test
 ```bash
-mvn clean test
+./mvnw clean test
 ```
 
 ### Run Demo UI
 ```bash
-mvn compile exec:java -Dexec.mainClass="io.github.trvladislav.terminal.Main"
+./mvnw compile exec:java -Dexec.mainClass="io.github.trvladislav.terminal.Main"
 ```
 
 The demo opens a Swing window with an 80x24 terminal grid. Type to write, use arrow keys to move, Enter for new lines, Backspace to delete.
@@ -165,3 +165,4 @@ src/
 - **Screen resize** — reflow or truncate lines when dimensions change
 - **Sparse line implementation** — alternative `BufferLine` that stores only non-empty cells, efficient for mostly-blank screens
 - **`Cell` record** — a read-only `record Cell(int character, int fg, int bg, int styles)` for the public API, keeping the raw `long` for internal performance paths
+
