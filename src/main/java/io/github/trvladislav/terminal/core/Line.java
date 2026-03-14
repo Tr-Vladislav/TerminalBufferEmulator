@@ -2,7 +2,7 @@ package io.github.trvladislav.terminal.core;
 
 import java.util.Arrays;
 
-public class Line {
+public class Line implements BufferLine {
     private final long[] cells;
     private final int width;
 
