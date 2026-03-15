@@ -564,4 +564,182 @@ class TerminalBufferTest {
         assertEquals(CellUtils.DEFAULT_BG, CellUtils.getBackgroundColor(cell));
         assertEquals(CellUtils.DEFAULT_STYLES, CellUtils.getStyles(cell));
     }
+
+    // ==================== Resize ====================
+
+    @Test
+    void testResizeWiderPreservesContent() {
+        buf.writeText("Hello");
+        buf.resize(20, HEIGHT);
+
+        assertEquals(20, buf.getWidth());
+        assertEquals('H', buf.getCharacterAt(0, 0));
+        assertEquals('o', buf.getCharacterAt(4, 0));
+        assertEquals(' ', buf.getCharacterAt(5, 0));
+    }
+
+    @Test
+    void testResizeNarrowerTruncatesAndReflows() {
+        // Use height 8 so reflow + empty lines don't overflow to scrollback
+        // 10-wide, 8 rows → write "ABCDE" on row 0, rows 1-7 empty
+        // Resize to 3-wide: "ABC"(soft) + "DE"(hard) + 7 empty = 9 lines → resize height to 10
+        TerminalBuffer b = new TerminalBuffer(10, 2, 5);
+        b.writeText("ABCDE");
+        b.resize(3, 4);
+
+        // "ABCDE" reflows into "ABC" (soft) + "DE" (hard) + 1 empty = 3 lines, fits in 4
+        assertEquals('A', b.getCharacterAt(0, 0));
+        assertEquals('B', b.getCharacterAt(1, 0));
+        assertEquals('C', b.getCharacterAt(2, 0));
+        assertEquals('D', b.getCharacterAt(0, 1));
+        assertEquals('E', b.getCharacterAt(1, 1));
+    }
+
+    @Test
+    void testResizeShorterMovesLinesToScrollback() {
+        for (int r = 0; r < HEIGHT; r++) {
+            buf.setCursorPosition(0, r);
+            buf.writeText("R" + r);
+        }
+
+        buf.resize(WIDTH, 2);
+
+        assertEquals(2, buf.getHeight());
+        assertEquals(2, buf.getScrollbackSize());
+        // Last 2 rows should be on screen
+        assertEquals('R', buf.getCharacterAt(0, 0));
+        assertEquals('R', buf.getCharacterAt(0, 1));
+    }
+
+    @Test
+    void testResizeTallerAddsEmptyLines() {
+        buf.writeText("Hello");
+        buf.resize(WIDTH, 8);
+
+        assertEquals(8, buf.getHeight());
+        assertEquals('H', buf.getCharacterAt(0, 0));
+        // New rows should be empty
+        assertEquals(' ', buf.getCharacterAt(0, 7));
+    }
+
+    @Test
+    void testResizeSameDimensionsDoesNothing() {
+        buf.writeText("Test");
+        buf.resize(WIDTH, HEIGHT);
+
+        assertEquals('T', buf.getCharacterAt(0, 0));
+    }
+
+    @Test
+    void testResizeInvalidDimensions() {
+        assertThrows(IllegalArgumentException.class, () -> buf.resize(0, 10));
+        assertThrows(IllegalArgumentException.class, () -> buf.resize(10, 0));
+    }
+
+    @Test
+    void testResizeCursorClamped() {
+        buf.setCursorPosition(8, 3);
+        buf.resize(5, 2);
+
+        assertEquals(4, buf.getCursorColumn());
+        assertEquals(1, buf.getCursorRow());
+    }
+
+    @Test
+    void testResizeReflowsSoftWrappedLines() {
+        // Write enough to wrap: 10-wide buffer, write 15 chars
+        buf.writeText("ABCDEFGHIJKLMNO");
+
+        // Row 0: "ABCDEFGHIJ" (soft), Row 1: "KLMNO     " (hard)
+        // Now resize wider — should merge back
+        buf.resize(20, HEIGHT);
+
+        assertEquals('A', buf.getCharacterAt(0, 0));
+        assertEquals('O', buf.getCharacterAt(14, 0));
+        assertEquals(' ', buf.getCharacterAt(15, 0));
+    }
+
+    @Test
+    void testResizePreservesHardBreaks() {
+        buf.writeText("AB");
+        buf.setCursorPosition(0, 1);
+        buf.writeText("CD");
+
+        // Two separate lines with hard breaks
+        buf.resize(20, HEIGHT);
+
+        // Should stay as 2 lines, not merge
+        assertEquals('A', buf.getCharacterAt(0, 0));
+        assertEquals('B', buf.getCharacterAt(1, 0));
+        assertEquals('C', buf.getCharacterAt(0, 1));
+        assertEquals('D', buf.getCharacterAt(1, 1));
+    }
+
+    @Test
+    void testResizeReflowsScrollbackContent() {
+        // Fill screen and push lines to scrollback
+        for (int r = 0; r < HEIGHT + 2; r++) {
+            buf.setCursorPosition(0, 0);
+            buf.writeText("LINE" + r);
+            buf.insertLineAtBottom();
+        }
+
+        int scrollBefore = buf.getScrollbackSize();
+        assertTrue(scrollBefore > 0);
+
+        buf.resize(5, HEIGHT);
+
+        // Scrollback lines should be reflowed to width 5
+        String scrollLine = buf.getScrollbackLineAsString(0);
+        assertEquals(5, scrollLine.length());
+    }
+
+    @Test
+    void testResizeNarrowerWithWideChars() {
+        // Start with 2 rows to minimize empty lines after reflow
+        TerminalBuffer b = new TerminalBuffer(10, 2, 5);
+        b.writeText("\u4E16\u754C");  // 世界 — each 2 cells wide, total 4 cells
+
+        // Reflow to width 3: "世 "(soft) + "界 "(hard) + 1 empty = 3 lines → resize to 4
+        b.resize(3, 4);
+
+        assertTrue(CellUtils.isWide(b.getScreenCell(0, 0)));
+        assertEquals(0x4E16, b.getCharacterAt(0, 0));
+        assertTrue(CellUtils.isWide(b.getScreenCell(0, 1)));
+        assertEquals(0x754C, b.getCharacterAt(0, 1));
+    }
+
+    @Test
+    void testResizeWiderMergesWideCharLines() {
+        TerminalBuffer narrow = new TerminalBuffer(4, 4, 5);
+        narrow.writeText("A\u4E16\u754CB");
+
+        // Width 4: "A世 " (soft, space pad at col 3), "界B  " (hard)
+        narrow.resize(10, 4);
+
+        // Merged: A + 世 + space + 界 + B (space is real content from padding)
+        assertEquals('A', narrow.getCharacterAt(0, 0));
+        assertEquals(0x4E16, narrow.getCharacterAt(1, 0));
+        // col 3 is the space that was placed when 界 didn't fit at last column
+        assertEquals(' ', narrow.getCharacterAt(3, 0));
+        assertEquals(0x754C, narrow.getCharacterAt(4, 0));
+        assertEquals('B', narrow.getCharacterAt(6, 0));
+    }
+
+    @Test
+    void testResizeOverflowToScrollback() {
+        // Fill all 4 rows
+        for (int r = 0; r < HEIGHT; r++) {
+            buf.setCursorPosition(0, r);
+            buf.writeText("ABCDEFGHIJ");
+        }
+
+        // Resize to width 5: each 10-char line becomes 2 lines → 8 lines total
+        // Screen holds 4, so 4 go to scrollback
+        buf.resize(5, HEIGHT);
+
+        assertEquals(4, buf.getScrollbackSize());
+        assertEquals('A', buf.getCharacterAt(0, 0));
+        assertEquals('F', buf.getCharacterAt(0, 1));
+    }
 }

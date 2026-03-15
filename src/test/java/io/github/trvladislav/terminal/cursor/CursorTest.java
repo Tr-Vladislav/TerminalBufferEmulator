@@ -135,6 +135,32 @@ class CursorTest {
         assertEquals(10, cursor.getRow());
     }
 
+    // --- resize ---
+
+    @Test
+    void testResizeClampsPosition() {
+        cursor.setPosition(50, 20);
+        cursor.resize(10, 5);
+
+        assertEquals(9, cursor.getColumn());
+        assertEquals(4, cursor.getRow());
+    }
+
+    @Test
+    void testResizeKeepsPositionIfItFits() {
+        cursor.setPosition(5, 3);
+        cursor.resize(100, 50);
+
+        assertEquals(5, cursor.getColumn());
+        assertEquals(3, cursor.getRow());
+    }
+
+    @Test
+    void testResizeInvalidDimensions() {
+        assertThrows(IllegalArgumentException.class, () -> cursor.resize(0, 10));
+        assertThrows(IllegalArgumentException.class, () -> cursor.resize(10, 0));
+    }
+
     // --- edge: 1x1 screen ---
 
     @Test
