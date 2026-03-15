@@ -150,19 +150,11 @@ Logical view:    [0]=B  [1]=C  [2]=D  [3]=E
 ./mvnw clean test
 ```
 
-### Run Demo UI
-```bash
-./mvnw compile exec:java -Dexec.mainClass="io.github.trvladislav.terminal.Main"
-```
-
-The demo opens a Swing window with an 80x24 terminal grid. Type to write, use arrow keys to move, Enter for new lines, Backspace to delete.
-
 ## Project Structure
 
 ```
 src/
 ├── main/java/io/github/trvladislav/terminal/
-│   ├── Main.java                          Swing demo application
 │   ├── buffer/
 │   │   ├── TerminalBuffer.java            Main facade
 │   │   ├── BufferLine.java                Line interface
