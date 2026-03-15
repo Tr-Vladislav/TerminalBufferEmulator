@@ -12,11 +12,11 @@ import io.github.trvladislav.terminal.cursor.Cursor;
  */
 public class TerminalBuffer {
 
-    private final int width;
-    private final int height;
+    private int width;
+    private int height;
     private final Cursor cursor;
-    private final BufferLine[] screen;
-    private final RingBuffer scrollback;
+    private BufferLine[] screen;
+    private RingBuffer scrollback;
 
     // Current text attributes applied to every subsequent write/insert
     private int currentFg;

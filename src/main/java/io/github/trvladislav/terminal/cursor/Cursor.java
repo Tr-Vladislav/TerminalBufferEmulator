@@ -9,8 +9,8 @@ public class Cursor {
 
     private int column;
     private int row;
-    private final int screenWidth;
-    private final int screenHeight;
+    private int screenWidth;
+    private int screenHeight;
 
     public Cursor(int screenWidth, int screenHeight) {
         if (screenWidth <= 0 || screenHeight <= 0) {
@@ -53,6 +53,20 @@ public class Cursor {
 
     public void moveRight(int n) {
         column = clampColumn(column + n);
+    }
+
+    /**
+     * Updates the screen bounds and clamps the cursor position to the new dimensions.
+     */
+    public void resize(int newWidth, int newHeight) {
+        if (newWidth <= 0 || newHeight <= 0) {
+            throw new IllegalArgumentException(
+                    "Screen dimensions must be positive: " + newWidth + "x" + newHeight);
+        }
+        this.screenWidth = newWidth;
+        this.screenHeight = newHeight;
+        this.column = clampColumn(column);
+        this.row = clampRow(row);
     }
 
     private int clampColumn(int col) {
