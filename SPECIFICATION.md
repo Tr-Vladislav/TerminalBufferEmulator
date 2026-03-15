@@ -22,6 +22,8 @@ Each cell stores:
 - Foreground color: default or one of 256 indexed colors
 - Background color: default or one of 256 indexed colors
 - Style flags: bold, italic, underline (at minimum)
+- Wide character flag: marks the left half of a 2-cell character
+- Wide continuation flag: marks the right half placeholder
 
 ### Attributes
 - Set current text attributes: foreground, background, styles
@@ -33,10 +35,16 @@ Each cell stores:
 - Move cursor: up, down, left, right by N cells
 - Cursor must not move outside screen bounds (clamped)
 
+### Wide Characters
+- Characters with display width 2 (CJK, emoji, fullwidth forms) occupy two adjacent cells: a wide cell (left half) and a continuation cell (right half)
+- Display width is determined by Unicode block ranges via `CellUtils.getDisplayWidth()`
+- Overwriting or deleting one half of a wide pair cleans up the orphaned half
+- String output skips continuation cells
+
 ### Editing — Cursor and Attribute Aware
-- **Write text** — overwrite content at cursor position using current attributes; advance cursor; wrap to next line at right edge; scroll screen when wrapping past the last row
-- **Insert text** — insert at cursor position, shifting existing content right (last character falls off); advance cursor; wrap and scroll as with write
-- **Fill line** — fill the current cursor row with a given character using current attributes (cursor position unchanged)
+- **Write text** — overwrite content at cursor position using current attributes; advance cursor; wrap to next line at right edge; scroll screen when wrapping past the last row. Wide characters advance cursor by 2 and wrap to the next line if at the last column.
+- **Insert text** — insert at cursor position, shifting existing content right (last character falls off); advance cursor; wrap and scroll as with write. Wide characters shift by 2.
+- **Fill line** — fill the current cursor row with a given character using current attributes (cursor position unchanged). Wide characters step by 2; trailing column gets a space if width is odd.
 - **Fill line empty** — reset the current cursor row to default empty cells
 
 ### Editing — Cursor Independent
@@ -72,7 +80,9 @@ Each cell is stored as a single `long` (64 bits) rather than a `Cell` object.
 [24..31]  Foreground color (8 bits — 256 colors)
 [32..39]  Background color (8 bits — 256 colors)
 [40..47]  Style flags (8 bits — bold, italic, underline)
-[48..63]  Reserved (16 bits)
+[48]      Wide flag (1 bit — left half of a 2-cell character)
+[49]      Wide continuation flag (1 bit — right half placeholder)
+[50..63]  Reserved (14 bits)
 ```
 
 **Rationale:**
@@ -117,17 +127,16 @@ cursor/    Position tracking — independent of buffer and cell
 
 | Area | Tests | Coverage |
 |------|-------|----------|
-| Cell encoding/decoding | 9 | All fields, max values, style flags, setters preserve other fields |
+| Cell encoding/decoding | 12 | All fields, max values, style flags, setters, wide flags, display width, wide pair storage |
 | Cursor | 14 | Positioning, clamping, all 4 directions, axis independence, 1x1 edge case |
-| Line | 8 | Init, write, insert shift, delete shift, clear, toString, bounds |
-| Ring buffer | 7 | Init, push/get, wrap-around, multiple wraps, capacity 1, bounds |
-| Terminal buffer | 34 | Setup, attributes, cursor, write/insert/fill, scroll, clear, content access, defaults |
-| **Total** | **72** | |
+| Line | 17 | Init, write, insert shift, delete shift, clear, toString, bounds, wide write/insert/delete/orphan cleanup |
+| Ring buffer | 8 | Init, push/get, wrap-around, multiple wraps, capacity 1, capacity 0, bounds |
+| Terminal buffer | 46 | Setup, attributes, validation, cursor, write/insert/fill, scroll, clear, content access, defaults, wide characters |
+| **Total** | **97** | |
 
 ## Possible Extensions
 
 - **24-bit true color** — expand cell layout using reserved bits for RGB channels
-- **Wide characters** — CJK and emoji occupying 2 cells, tracked via a reserved bit flag
-- **Screen resize** — reflow or truncate lines when terminal dimensions change
+- **Screen resize** — reflow lines when dimensions change, using soft/hard line break tracking
 - **Sparse line** — alternative `BufferLine` for mostly-empty screens (stores only non-empty cells)
 - **Selection and copy** — range selection across screen and scrollback for clipboard operations

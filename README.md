@@ -35,11 +35,11 @@ Each terminal cell (character + foreground color + background color + style flag
 ### Memory Layout
 
 ```
-Bit:  63        48 47      40 39      32 31      24 23             0
-      ┌──────────┬──────────┬──────────┬──────────┬─────────────────┐
-      │ Reserved │  Styles  │ BG Color │ FG Color │   Character     │
-      │ (16 bit) │  (8 bit) │  (8 bit) │  (8 bit) │  (24 bit)      │
-      └──────────┴──────────┴──────────┴──────────┴─────────────────┘
+Bit:  63    50 49  48 47      40 39      32 31      24 23             0
+      ┌───────┬───┬──┬──────────┬──────────┬──────────┬─────────────────┐
+      │ Rsrvd │WC │W │  Styles  │ BG Color │ FG Color │   Character     │
+      │(14bit)│(1)│(1)│  (8 bit) │  (8 bit) │  (8 bit) │  (24 bit)      │
+      └───────┴───┴──┴──────────┴──────────┴──────────┴─────────────────┘
 ```
 
 | Field | Bits | Range | Description |
@@ -48,7 +48,9 @@ Bit:  63        48 47      40 39      32 31      24 23             0
 | Foreground | 24..31 | 0 — 255 | 8-bit color index (16 standard + 240 extended) |
 | Background | 32..39 | 0 — 255 | 8-bit color index |
 | Styles | 40..47 | bitmask | Bold (bit 0), Italic (bit 1), Underline (bit 2) |
-| Reserved | 48..63 | — | Available for wide-char flags, hyperlinks, etc. |
+| Wide | 48 | 0 or 1 | Wide character flag — marks the left half of a 2-cell character |
+| Wide Cont | 49 | 0 or 1 | Wide continuation flag — marks the right half placeholder |
+| Reserved | 50..63 | — | Available for future use |
 
 ### Why a Primitive `long`?
 
@@ -58,8 +60,31 @@ Bit:  63        48 47      40 39      32 31      24 23             0
 
 ### Trade-offs
 
-- 8-bit color limits to 256 colors. Modern terminals support 24-bit true color (RGB). The 16 reserved bits (48..63) could be repurposed for this in a future version.
+- 8-bit color limits to 256 colors. Modern terminals support 24-bit true color (RGB). The reserved bits (50..63) could be repurposed for this in a future version.
 - Reading individual fields requires calling `CellUtils.getCharacter(cell)` etc., which is less readable than `cell.character`. This is the cost of avoiding object allocation.
+
+## Wide Character Support
+
+CJK ideographs, Hiragana, Katakana, Hangul, fullwidth forms, and emoji occupy 2 terminal cells. The buffer handles this at three layers:
+
+### Cell Layer (`CellUtils`)
+
+- `getDisplayWidth(codePoint)` returns 1 or 2 based on Unicode block ranges. Fast-exits for ASCII (`< 0x1100`).
+- `encodeWide()` packs a cell with the wide flag (bit 48) set — marks the left half.
+- `createWideContinuation()` creates a placeholder cell with the continuation flag (bit 49) — the right half.
+
+### Line Layer (`Line`)
+
+- **Write**: a wide cell writes both the left half and its continuation. If there's no room (last column), does nothing. Overwriting either half of an existing wide pair cleans up the orphaned half.
+- **Insert**: shifts content right by 2, writes the pair. Edge cleanup handles wide pairs split by the shift.
+- **Delete**: deleting either half removes both and shifts left by 2.
+- **toString / appendTo**: skips continuation cells so wide characters appear once in string output.
+
+### Buffer Layer (`TerminalBuffer`)
+
+- **writeText / insertText**: checks display width. If a wide character would start at the last column, a space is placed there and the cursor wraps to the next line before writing the wide pair.
+- **fillLine**: steps by 2 for wide characters. If the line has odd width, the last column gets a space.
+- **advanceCursor**: advances by 2 after writing a wide character.
 
 ## Manual Ring Buffer for Scrollback
 
@@ -102,9 +127,9 @@ Logical view:    [0]=B  [1]=C  [2]=D  [3]=E
 - All positions are clamped to screen bounds — cursor never leaves the visible area
 
 ### Editing
-- **Write text** — overwrites at cursor position, wraps at line end, scrolls at screen bottom
-- **Insert text** — shifts existing content right (last character falls off), wraps and scrolls
-- **Fill line** — fills the current row with a character using current attributes
+- **Write text** — overwrites at cursor position, wraps at line end, scrolls at screen bottom. Wide characters occupy 2 cells and wrap if at the last column.
+- **Insert text** — shifts existing content right (last character falls off), wraps and scrolls. Wide characters shift by 2.
+- **Fill line** — fills the current row with a character using current attributes. Wide characters step by 2; odd-width lines get a trailing space.
 - **Insert line at bottom** — scrolls screen up, top line moves to scrollback
 - **Clear screen** — resets all screen lines, preserves scrollback
 - **Clear all** — resets screen and scrollback
@@ -160,9 +185,8 @@ src/
 
 ## Possible Improvements
 
-- **24-bit true color** — expand the cell layout to support RGB foreground/background using the 16 reserved bits
-- **Wide character support** — CJK characters and emoji that occupy 2 cells, using a reserved bit as a wide-char flag
-- **Screen resize** — reflow or truncate lines when dimensions change
+- **24-bit true color** — expand the cell layout to support RGB foreground/background using the reserved bits
+- **Screen resize** — reflow lines when dimensions change, using soft/hard line break tracking
 - **Sparse line implementation** — alternative `BufferLine` that stores only non-empty cells, efficient for mostly-blank screens
 - **`Cell` record** — a read-only `record Cell(int character, int fg, int bg, int styles)` for the public API, keeping the raw `long` for internal performance paths
 
