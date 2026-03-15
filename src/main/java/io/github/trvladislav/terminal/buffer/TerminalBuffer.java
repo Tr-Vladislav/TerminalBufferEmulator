@@ -150,28 +150,7 @@ public class TerminalBuffer {
      * Scrolls the screen up when wrapping past the last row.
      */
     public void writeText(String text) {
-        for (int i = 0; i < text.length(); ) {
-            int codePoint = text.codePointAt(i);
-            int displayWidth = CellUtils.getDisplayWidth(codePoint);
-
-            if (displayWidth == 2) {
-                // Wide char needs 2 cells — if at last column, wrap first
-                if (cursor.getColumn() == width - 1) {
-                    screen[cursor.getRow()].write(cursor.getColumn(),
-                            CellUtils.encode(' ', currentFg, currentBg, currentStyles));
-                    advanceCursor(1);
-                }
-                long cell = CellUtils.encodeWide(codePoint, currentFg, currentBg, currentStyles);
-                screen[cursor.getRow()].write(cursor.getColumn(), cell);
-                advanceCursor(2);
-            } else {
-                long cell = CellUtils.encode(codePoint, currentFg, currentBg, currentStyles);
-                screen[cursor.getRow()].write(cursor.getColumn(), cell);
-                advanceCursor(1);
-            }
-
-            i += Character.charCount(codePoint);
-        }
+        processCharacters(text, CellOperation.WRITE);
     }
 
     /**
@@ -181,27 +160,7 @@ public class TerminalBuffer {
      * Scrolls the screen up when wrapping past the last row.
      */
     public void insertText(String text) {
-        for (int i = 0; i < text.length(); ) {
-            int codePoint = text.codePointAt(i);
-            int displayWidth = CellUtils.getDisplayWidth(codePoint);
-
-            if (displayWidth == 2) {
-                if (cursor.getColumn() == width - 1) {
-                    screen[cursor.getRow()].write(cursor.getColumn(),
-                            CellUtils.encode(' ', currentFg, currentBg, currentStyles));
-                    advanceCursor(1);
-                }
-                long cell = CellUtils.encodeWide(codePoint, currentFg, currentBg, currentStyles);
-                screen[cursor.getRow()].insert(cursor.getColumn(), cell);
-                advanceCursor(2);
-            } else {
-                long cell = CellUtils.encode(codePoint, currentFg, currentBg, currentStyles);
-                screen[cursor.getRow()].insert(cursor.getColumn(), cell);
-                advanceCursor(1);
-            }
-
-            i += Character.charCount(codePoint);
-        }
+        processCharacters(text, CellOperation.INSERT);
     }
 
     /**
@@ -488,7 +447,7 @@ public class TerminalBuffer {
      * Returns the index of the last non-empty cell + 1.
      */
     private int trimTrailingEmpty(long[] cells) {
-        long emptyCell = CellUtils.createEmpty();
+        long emptyCell = CellUtils.EMPTY_CELL;
         int length = cells.length;
         while (length > 0 && cells[length - 1] == emptyCell) {
             length--;
@@ -509,7 +468,7 @@ public class TerminalBuffer {
             return lines;
         }
 
-        long emptyCell = CellUtils.createEmpty();
+        long emptyCell = CellUtils.EMPTY_CELL;
         long[] lineCells = createEmptyCells(newWidth);
         int col = 0;
 
@@ -565,11 +524,52 @@ public class TerminalBuffer {
 
     private long[] createEmptyCells(int width) {
         long[] cells = new long[width];
-        Arrays.fill(cells, CellUtils.createEmpty());
+        Arrays.fill(cells, CellUtils.EMPTY_CELL);
         return cells;
     }
 
     // ==================== Internal ====================
+
+    private enum CellOperation { WRITE, INSERT }
+
+    /**
+     * Processes each character in the text, encoding it with current attributes
+     * and applying the given operation (write or insert) to the current line.
+     * Handles wide characters, wrapping, and scrolling.
+     */
+    private void processCharacters(String text, CellOperation operation) {
+        for (int i = 0; i < text.length(); ) {
+            int codePoint = text.codePointAt(i);
+            int displayWidth = CellUtils.getDisplayWidth(codePoint);
+
+            if (displayWidth == 2) {
+                // Wide char needs 2 cells — if at last column, pad and wrap first
+                if (cursor.getColumn() == width - 1) {
+                    screen[cursor.getRow()].write(cursor.getColumn(),
+                            CellUtils.encode(' ', currentFg, currentBg, currentStyles));
+                    advanceCursor(1);
+                }
+                long cell = CellUtils.encodeWide(codePoint, currentFg, currentBg, currentStyles);
+                applyCell(cell, operation);
+                advanceCursor(2);
+            } else {
+                long cell = CellUtils.encode(codePoint, currentFg, currentBg, currentStyles);
+                applyCell(cell, operation);
+                advanceCursor(1);
+            }
+
+            i += Character.charCount(codePoint);
+        }
+    }
+
+    private void applyCell(long cell, CellOperation operation) {
+        BufferLine line = screen[cursor.getRow()];
+        int col = cursor.getColumn();
+        switch (operation) {
+            case WRITE -> line.write(col, cell);
+            case INSERT -> line.insert(col, cell);
+        }
+    }
 
     /**
      * Advances the cursor by n positions: moves right within the line,

@@ -37,6 +37,15 @@ public final class CellUtils {
     private static final long WIDE_FLAG = 1L << 48;
     private static final long WIDE_CONT_FLAG = 1L << 49;
 
+    /**
+     * Pre-computed empty cell: space character, default fg/bg, no styles.
+     */
+    public static final long EMPTY_CELL =
+            (' ' & ((1L << CHAR_BITS) - 1)) |
+            ((DEFAULT_FG & 0xFFL) << FG_SHIFT) |
+            ((DEFAULT_BG & 0xFFL) << BG_SHIFT) |
+            ((DEFAULT_STYLES & 0xFFL) << STYLE_SHIFT);
+
     private CellUtils() {
     }
 
@@ -51,10 +60,11 @@ public final class CellUtils {
     }
 
     /**
-     * Returns an empty space cell with default colors (FG: 7, BG: 0).
+     * @deprecated Use {@link #EMPTY_CELL} constant directly.
      */
+    @Deprecated
     public static long createEmpty() {
-        return encode(' ', DEFAULT_FG, DEFAULT_BG, DEFAULT_STYLES);
+        return EMPTY_CELL;
     }
 
     // --- Decoders ---

@@ -13,12 +13,12 @@ public class Line implements BufferLine {
         this.width = width;
         this.cells = new long[width];
         this.softWrapped = false;
-        Arrays.fill(cells, CellUtils.createEmpty());
+        Arrays.fill(cells, CellUtils.EMPTY_CELL);
     }
 
     Line(long[] cells, boolean softWrapped) {
         this.width = cells.length;
-        this.cells = cells;
+        this.cells = Arrays.copyOf(cells, cells.length);
         this.softWrapped = softWrapped;
     }
 
@@ -91,7 +91,7 @@ public class Line implements BufferLine {
      * Resets all cells to empty (space with default colors).
      */
     public void clear() {
-        Arrays.fill(cells, CellUtils.createEmpty());
+        Arrays.fill(cells, CellUtils.EMPTY_CELL);
         this.softWrapped = false;
     }
 
@@ -144,7 +144,7 @@ public class Line implements BufferLine {
     private void shiftLeft(int column, int count) {
         System.arraycopy(cells, column + count, cells, column, width - column - count);
         for (int i = width - count; i < width; i++) {
-            cells[i] = CellUtils.createEmpty();
+            cells[i] = CellUtils.EMPTY_CELL;
         }
     }
 
@@ -154,9 +154,9 @@ public class Line implements BufferLine {
     private void clearOrphanedWide(int column) {
         long cell = cells[column];
         if (CellUtils.isWide(cell) && column + 1 < width) {
-            cells[column + 1] = CellUtils.createEmpty();
+            cells[column + 1] = CellUtils.EMPTY_CELL;
         } else if (CellUtils.isWideContinuation(cell) && column > 0) {
-            cells[column - 1] = CellUtils.createEmpty();
+            cells[column - 1] = CellUtils.EMPTY_CELL;
         }
     }
 
@@ -167,11 +167,11 @@ public class Line implements BufferLine {
      */
     private void cleanupEdge() {
         if (CellUtils.isWide(cells[width - 1])) {
-            cells[width - 1] = CellUtils.createEmpty();
+            cells[width - 1] = CellUtils.EMPTY_CELL;
         }
         if (CellUtils.isWideContinuation(cells[width - 1])
                 && (width < 2 || !CellUtils.isWide(cells[width - 2]))) {
-            cells[width - 1] = CellUtils.createEmpty();
+            cells[width - 1] = CellUtils.EMPTY_CELL;
         }
     }
 

@@ -49,13 +49,15 @@ class CellUtilsTest {
     }
 
     @Test
-    void testCreateEmpty() {
-        long cell = CellUtils.createEmpty();
+    void testEmptyCell() {
+        long cell = CellUtils.EMPTY_CELL;
 
         assertEquals(' ', CellUtils.getCharacter(cell));
-        assertEquals(7, CellUtils.getForegroundColor(cell));
-        assertEquals(0, CellUtils.getBackgroundColor(cell));
+        assertEquals(CellUtils.DEFAULT_FG, CellUtils.getForegroundColor(cell));
+        assertEquals(CellUtils.DEFAULT_BG, CellUtils.getBackgroundColor(cell));
         assertEquals(CellUtils.STYLE_NONE, CellUtils.getStyles(cell));
+        assertFalse(CellUtils.isWide(cell));
+        assertFalse(CellUtils.isWideContinuation(cell));
     }
 
     @Test
