@@ -93,6 +93,121 @@ class LineTest {
         assertEquals(WIDTH, result.length());
     }
 
+    // ==================== Wide Characters ====================
+
+    @Test
+    void testWriteWideCharOccupiesTwoCells() {
+        long wide = CellUtils.encodeWide(0x4E16, 7, 0, 0); // 世
+        line.write(3, wide);
+
+        assertTrue(CellUtils.isWide(line.getCell(3)));
+        assertEquals(0x4E16, CellUtils.getCharacter(line.getCell(3)));
+        assertTrue(CellUtils.isWideContinuation(line.getCell(4)));
+    }
+
+    @Test
+    void testWriteWideAtLastColumnDoesNothing() {
+        long wide = CellUtils.encodeWide(0x4E16, 7, 0, 0);
+        line.write(WIDTH - 1, wide);
+
+        // Should remain empty — no room for continuation
+        assertEquals(' ', CellUtils.getCharacter(line.getCell(WIDTH - 1)));
+        assertFalse(CellUtils.isWide(line.getCell(WIDTH - 1)));
+    }
+
+    @Test
+    void testWriteOverWidePairCleansUpOrphan() {
+        long wide = CellUtils.encodeWide(0x4E16, 7, 0, 0);
+        line.write(3, wide);
+
+        // Overwrite left half with regular char — continuation at 4 should be cleared
+        line.write(3, CellUtils.encode('A', 7, 0, 0));
+
+        assertEquals('A', CellUtils.getCharacter(line.getCell(3)));
+        assertFalse(CellUtils.isWideContinuation(line.getCell(4)));
+        assertEquals(' ', CellUtils.getCharacter(line.getCell(4)));
+    }
+
+    @Test
+    void testWriteOverContinuationCleansUpOrphan() {
+        long wide = CellUtils.encodeWide(0x4E16, 7, 0, 0);
+        line.write(3, wide);
+
+        // Overwrite continuation at 4 — left half at 3 should be cleared
+        line.write(4, CellUtils.encode('B', 7, 0, 0));
+
+        assertEquals(' ', CellUtils.getCharacter(line.getCell(3)));
+        assertFalse(CellUtils.isWide(line.getCell(3)));
+        assertEquals('B', CellUtils.getCharacter(line.getCell(4)));
+    }
+
+    @Test
+    void testInsertWideShiftsByTwo() {
+        line.write(0, CellUtils.encode('A', 7, 0, 0));
+        line.write(1, CellUtils.encode('B', 7, 0, 0));
+
+        long wide = CellUtils.encodeWide(0x4E16, 7, 0, 0);
+        line.insert(0, wide);
+
+        assertTrue(CellUtils.isWide(line.getCell(0)));
+        assertTrue(CellUtils.isWideContinuation(line.getCell(1)));
+        assertEquals('A', CellUtils.getCharacter(line.getCell(2)));
+        assertEquals('B', CellUtils.getCharacter(line.getCell(3)));
+    }
+
+    @Test
+    void testInsertWideAtLastColumnDoesNothing() {
+        line.write(0, CellUtils.encode('A', 7, 0, 0));
+
+        long wide = CellUtils.encodeWide(0x4E16, 7, 0, 0);
+        line.insert(WIDTH - 1, wide);
+
+        // Should remain unchanged
+        assertEquals('A', CellUtils.getCharacter(line.getCell(0)));
+        assertFalse(CellUtils.isWide(line.getCell(WIDTH - 1)));
+    }
+
+    @Test
+    void testDeleteWideRemovesBothHalves() {
+        line.write(0, CellUtils.encode('A', 7, 0, 0));
+        long wide = CellUtils.encodeWide(0x4E16, 7, 0, 0);
+        line.write(1, wide);
+        line.write(3, CellUtils.encode('B', 7, 0, 0));
+
+        // Delete the left half
+        line.delete(1);
+
+        assertEquals('A', CellUtils.getCharacter(line.getCell(0)));
+        assertEquals('B', CellUtils.getCharacter(line.getCell(1)));
+    }
+
+    @Test
+    void testDeleteContinuationRemovesBothHalves() {
+        line.write(0, CellUtils.encode('A', 7, 0, 0));
+        long wide = CellUtils.encodeWide(0x4E16, 7, 0, 0);
+        line.write(1, wide);
+        line.write(3, CellUtils.encode('B', 7, 0, 0));
+
+        // Delete the continuation half
+        line.delete(2);
+
+        assertEquals('A', CellUtils.getCharacter(line.getCell(0)));
+        assertEquals('B', CellUtils.getCharacter(line.getCell(1)));
+    }
+
+    @Test
+    void testToStringSkipsContinuationCells() {
+        long wide = CellUtils.encodeWide(0x4E16, 7, 0, 0); // 世
+        line.write(0, wide);
+        line.write(2, CellUtils.encode('A', 7, 0, 0));
+
+        String result = line.toString();
+        assertEquals('\u4E16', result.charAt(0));
+        assertEquals('A', result.charAt(1));
+        // Width is 10, wide takes 2 cells but 1 char in string, so length = 9
+        assertEquals(WIDTH - 1, result.length());
+    }
+
     @Test
     void testOutOfBoundsThrowsException() {
         assertThrows(IndexOutOfBoundsException.class, () -> line.write(-1, CellUtils.encode('!', 7, 0, 0)));
