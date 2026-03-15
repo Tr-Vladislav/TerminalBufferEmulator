@@ -19,7 +19,7 @@ public class TerminalBuffer {
     private int width;
     private int height;
     private final Cursor cursor;
-    private BufferLine[] screen;
+    private MutableBufferLine[] screen;
     private RingBuffer scrollback;
 
     // Current text attributes applied to every subsequent write/insert
@@ -40,7 +40,7 @@ public class TerminalBuffer {
         this.width = width;
         this.height = height;
         this.cursor = new Cursor(width, height);
-        this.screen = new BufferLine[height];
+        this.screen = new MutableBufferLine[height];
         this.scrollback = new RingBuffer(maxScrollback);
 
         for (int i = 0; i < height; i++) {
@@ -170,7 +170,7 @@ public class TerminalBuffer {
      */
     public void fillLine(int codePoint) {
         int displayWidth = CellUtils.getDisplayWidth(codePoint);
-        BufferLine line = screen[cursor.getRow()];
+        MutableBufferLine line = screen[cursor.getRow()];
 
         if (displayWidth == 2) {
             long cell = CellUtils.encodeWide(codePoint, currentFg, currentBg, currentStyles);
@@ -214,7 +214,7 @@ public class TerminalBuffer {
      * Cursor position is reset to (0, 0).
      */
     public void clearScreen() {
-        for (BufferLine line : screen) {
+        for (MutableBufferLine line : screen) {
             line.clear();
         }
         cursor.setPosition(0, 0);
@@ -349,15 +349,14 @@ public class TerminalBuffer {
         // 3. Distribute into new scrollback and screen
         int scrollbackCapacity = scrollback.capacity();
         RingBuffer newScrollback = new RingBuffer(scrollbackCapacity);
-        BufferLine[] newScreen = new BufferLine[newHeight];
+        MutableBufferLine[] newScreen = new MutableBufferLine[newHeight];
 
         int totalLines = reflowed.size();
 
         if (totalLines <= newHeight) {
             // All content fits on screen
-            int screenStart = 0;
             for (int i = 0; i < totalLines; i++) {
-                newScreen[screenStart + i] = reflowed.get(i);
+                newScreen[i] = (MutableBufferLine) reflowed.get(i);
             }
             // Fill remaining with empty lines
             for (int i = totalLines; i < newHeight; i++) {
@@ -370,7 +369,7 @@ public class TerminalBuffer {
                 newScrollback.push(reflowed.get(i));
             }
             for (int i = 0; i < newHeight; i++) {
-                newScreen[i] = reflowed.get(screenStart + i);
+                newScreen[i] = (MutableBufferLine) reflowed.get(screenStart + i);
             }
         }
 
@@ -424,7 +423,8 @@ public class TerminalBuffer {
             boolean merging = true;
 
             while (merging && i < physicalLines.size()) {
-                long[] cells = physicalLines.get(i).getCells();
+                BufferLine line = physicalLines.get(i);
+                long[] cells = (line instanceof Line l) ? l.getCellsDirect() : line.getCells();
                 segments.add(cells);
                 totalCells += cells.length;
                 merging = physicalLines.get(i).isSoftWrapped();
@@ -468,7 +468,6 @@ public class TerminalBuffer {
             return lines;
         }
 
-        long emptyCell = CellUtils.EMPTY_CELL;
         long[] lineCells = createEmptyCells(newWidth);
         int col = 0;
 
@@ -563,7 +562,7 @@ public class TerminalBuffer {
     }
 
     private void applyCell(long cell, CellOperation operation) {
-        BufferLine line = screen[cursor.getRow()];
+        MutableBufferLine line = screen[cursor.getRow()];
         int col = cursor.getColumn();
         switch (operation) {
             case WRITE -> line.write(col, cell);

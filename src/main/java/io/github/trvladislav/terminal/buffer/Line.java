@@ -4,7 +4,7 @@ import io.github.trvladislav.terminal.cell.CellUtils;
 
 import java.util.Arrays;
 
-public class Line implements BufferLine {
+public class Line implements MutableBufferLine {
     private final long[] cells;
     private final int width;
     private boolean softWrapped;
@@ -102,6 +102,14 @@ public class Line implements BufferLine {
 
     public long[] getCells() {
         return Arrays.copyOf(cells, width);
+    }
+
+    /**
+     * Returns the raw backing array without copying.
+     * Package-private — only for internal hot paths (reflow).
+     */
+    long[] getCellsDirect() {
+        return cells;
     }
 
     public int getWidth() {

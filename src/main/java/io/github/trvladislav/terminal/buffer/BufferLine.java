@@ -1,18 +1,10 @@
 package io.github.trvladislav.terminal.buffer;
 
 /**
- * Abstraction for a single line in a terminal buffer.
- * Allows alternative implementations (e.g., sparse lines, wrapped lines).
+ * Read-only view of a single line in a terminal buffer.
+ * Returned from content-access APIs (screen and scrollback).
  */
 public interface BufferLine {
-
-    void write(int column, long cellData);
-
-    void insert(int column, long cellData);
-
-    void delete(int column);
-
-    void clear();
 
     long getCell(int column);
 
@@ -21,8 +13,6 @@ public interface BufferLine {
     int getWidth();
 
     boolean isSoftWrapped();
-
-    void setSoftWrapped(boolean softWrapped);
 
     void appendTo(StringBuilder sb);
 }
