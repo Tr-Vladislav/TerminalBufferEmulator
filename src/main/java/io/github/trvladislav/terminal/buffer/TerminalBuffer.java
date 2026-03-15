@@ -3,6 +3,10 @@ package io.github.trvladislav.terminal.buffer;
 import io.github.trvladislav.terminal.cell.CellUtils;
 import io.github.trvladislav.terminal.cursor.Cursor;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 /**
  * The main facade that ties together the screen grid, scrollback history,
  * cursor, and current text attributes.
@@ -355,6 +359,214 @@ public class TerminalBuffer {
 
     public int getScrollbackCapacity() {
         return scrollback.capacity();
+    }
+
+    // ==================== Resize ====================
+
+    /**
+     * Resizes the terminal to new dimensions with content reflow.
+     *
+     * Width change: soft-wrapped lines are merged into logical lines and
+     * re-wrapped to the new width. Hard breaks are preserved.
+     *
+     * Height change: if shorter, top screen lines move to scrollback.
+     * If taller, empty lines are added at the bottom.
+     *
+     * Scrollback content is also reflowed to the new width.
+     */
+    public void resize(int newWidth, int newHeight) {
+        if (newWidth <= 0 || newHeight <= 0) {
+            throw new IllegalArgumentException(
+                    "Screen dimensions must be positive: " + newWidth + "x" + newHeight);
+        }
+        if (newWidth == width && newHeight == height) return;
+
+        // 1. Collect all physical lines: scrollback + screen
+        List<BufferLine> allLines = collectAllLines();
+
+        // 2. Group into logical lines and re-wrap to new width
+        List<BufferLine> reflowed = reflow(allLines, newWidth);
+
+        // 3. Distribute into new scrollback and screen
+        int scrollbackCapacity = scrollback.capacity();
+        RingBuffer newScrollback = new RingBuffer(scrollbackCapacity);
+        BufferLine[] newScreen = new BufferLine[newHeight];
+
+        int totalLines = reflowed.size();
+
+        if (totalLines <= newHeight) {
+            // All content fits on screen
+            int screenStart = 0;
+            for (int i = 0; i < totalLines; i++) {
+                newScreen[screenStart + i] = reflowed.get(i);
+            }
+            // Fill remaining with empty lines
+            for (int i = totalLines; i < newHeight; i++) {
+                newScreen[i] = new Line(newWidth);
+            }
+        } else {
+            // Excess goes to scrollback, last newHeight lines go to screen
+            int screenStart = totalLines - newHeight;
+            for (int i = 0; i < screenStart; i++) {
+                newScrollback.push(reflowed.get(i));
+            }
+            for (int i = 0; i < newHeight; i++) {
+                newScreen[i] = reflowed.get(screenStart + i);
+            }
+        }
+
+        // 4. Update state
+        this.width = newWidth;
+        this.height = newHeight;
+        this.screen = newScreen;
+        this.scrollback = newScrollback;
+        cursor.resize(newWidth, newHeight);
+    }
+
+    /**
+     * Collects all lines in order: scrollback (oldest first), then screen (top to bottom).
+     */
+    private List<BufferLine> collectAllLines() {
+        List<BufferLine> all = new ArrayList<>(scrollback.size() + height);
+        all.addAll(scrollback.toList());
+        for (int i = 0; i < height; i++) {
+            all.add(screen[i]);
+        }
+        return all;
+    }
+
+    /**
+     * Groups physical lines into logical lines using softWrapped flag,
+     * then re-wraps each logical line to the given width.
+     */
+    private List<BufferLine> reflow(List<BufferLine> physicalLines, int newWidth) {
+        List<BufferLine> result = new ArrayList<>();
+        List<long[]> logicalLines = groupLogicalLines(physicalLines);
+
+        for (long[] logicalCells : logicalLines) {
+            int contentLength = trimTrailingEmpty(logicalCells);
+            result.addAll(wrapLogicalLine(logicalCells, contentLength, newWidth));
+        }
+
+        return result;
+    }
+
+    /**
+     * Merges consecutive soft-wrapped physical lines into logical lines.
+     * Each logical line is a single long[] of all cells concatenated.
+     */
+    private List<long[]> groupLogicalLines(List<BufferLine> physicalLines) {
+        List<long[]> logicalLines = new ArrayList<>();
+        int i = 0;
+
+        while (i < physicalLines.size()) {
+            List<long[]> segments = new ArrayList<>();
+            int totalCells = 0;
+            boolean merging = true;
+
+            while (merging && i < physicalLines.size()) {
+                long[] cells = physicalLines.get(i).getCells();
+                segments.add(cells);
+                totalCells += cells.length;
+                merging = physicalLines.get(i).isSoftWrapped();
+                i++;
+            }
+
+            long[] merged = new long[totalCells];
+            int offset = 0;
+            for (long[] segment : segments) {
+                System.arraycopy(segment, 0, merged, offset, segment.length);
+                offset += segment.length;
+            }
+            logicalLines.add(merged);
+        }
+
+        return logicalLines;
+    }
+
+    /**
+     * Returns the index of the last non-empty cell + 1.
+     */
+    private int trimTrailingEmpty(long[] cells) {
+        long emptyCell = CellUtils.createEmpty();
+        int length = cells.length;
+        while (length > 0 && cells[length - 1] == emptyCell) {
+            length--;
+        }
+        return length;
+    }
+
+    /**
+     * Wraps a logical line (flat cell array) into physical lines of the given width.
+     * Skips continuation cells and rebuilds wide char pairs at new positions.
+     * Returns at least one line (empty logical lines produce one empty physical line).
+     */
+    private List<BufferLine> wrapLogicalLine(long[] logicalCells, int contentLength, int newWidth) {
+        List<BufferLine> lines = new ArrayList<>();
+
+        if (contentLength == 0) {
+            lines.add(new Line(newWidth));
+            return lines;
+        }
+
+        long emptyCell = CellUtils.createEmpty();
+        long[] lineCells = createEmptyCells(newWidth);
+        int col = 0;
+
+        for (int c = 0; c < contentLength; c++) {
+            long cell = logicalCells[c];
+            if (CellUtils.isWideContinuation(cell)) continue;
+
+            int cellWidth = CellUtils.isWide(cell) ? 2 : 1;
+
+            // Wide char at last column — pad with space and soft-wrap
+            if (cellWidth == 2 && col == newWidth - 1) {
+                lineCells[col] = CellUtils.encode(' ',
+                        CellUtils.getForegroundColor(cell),
+                        CellUtils.getBackgroundColor(cell),
+                        CellUtils.getStyles(cell));
+                lines.add(new Line(lineCells, true));
+                lineCells = createEmptyCells(newWidth);
+                col = 0;
+            }
+
+            // Place the cell
+            lineCells[col] = cell;
+            if (cellWidth == 2 && col + 1 < newWidth) {
+                lineCells[col + 1] = CellUtils.createWideContinuation(
+                        CellUtils.getForegroundColor(cell),
+                        CellUtils.getBackgroundColor(cell),
+                        CellUtils.getStyles(cell));
+            }
+            col += cellWidth;
+
+            // Line full and more content ahead — soft-wrap
+            if (col >= newWidth && hasMoreContent(logicalCells, c + 1, contentLength)) {
+                lines.add(new Line(lineCells, true));
+                lineCells = createEmptyCells(newWidth);
+                col = 0;
+            }
+        }
+
+        // Last line — hard break
+        lines.add(new Line(lineCells, false));
+        return lines;
+    }
+
+    /**
+     * Returns true if there are non-continuation cells remaining after fromIndex.
+     */
+    private boolean hasMoreContent(long[] cells, int fromIndex, int contentLength) {
+        for (int i = fromIndex; i < contentLength; i++) {
+            if (!CellUtils.isWideContinuation(cells[i])) return true;
+        }
+        return false;
+    }
+
+    private long[] createEmptyCells(int width) {
+        long[] cells = new long[width];
+        Arrays.fill(cells, CellUtils.createEmpty());
+        return cells;
     }
 
     // ==================== Internal ====================
