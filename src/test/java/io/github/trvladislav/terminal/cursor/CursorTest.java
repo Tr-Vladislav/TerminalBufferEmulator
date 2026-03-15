@@ -161,6 +161,38 @@ class CursorTest {
         assertThrows(IllegalArgumentException.class, () -> cursor.resize(10, 0));
     }
 
+    // --- negative N is a no-op ---
+
+    @Test
+    void testNegativeMovementIsNoOp() {
+        cursor.setPosition(10, 10);
+
+        cursor.moveUp(-5);
+        assertEquals(10, cursor.getRow());
+
+        cursor.moveDown(-5);
+        assertEquals(10, cursor.getRow());
+
+        cursor.moveLeft(-5);
+        assertEquals(10, cursor.getColumn());
+
+        cursor.moveRight(-5);
+        assertEquals(10, cursor.getColumn());
+    }
+
+    @Test
+    void testZeroMovementIsNoOp() {
+        cursor.setPosition(10, 10);
+
+        cursor.moveUp(0);
+        cursor.moveDown(0);
+        cursor.moveLeft(0);
+        cursor.moveRight(0);
+
+        assertEquals(10, cursor.getColumn());
+        assertEquals(10, cursor.getRow());
+    }
+
     // --- edge: 1x1 screen ---
 
     @Test

@@ -573,22 +573,47 @@ public class TerminalBuffer {
 
     /**
      * Advances the cursor by n positions: moves right within the line,
-     * wraps to the next line at the right edge, or scrolls up at the bottom.
+     * wraps to the next line at the right edge, scrolls up at the bottom.
+     * Uses arithmetic instead of per-step looping.
      */
     private void advanceCursor(int n) {
-        for (int step = 0; step < n; step++) {
-            if (cursor.getColumn() < width - 1) {
-                cursor.setPosition(cursor.getColumn() + 1, cursor.getRow());
-            } else {
-                screen[cursor.getRow()].setSoftWrapped(true);
-                if (cursor.getRow() < height - 1) {
-                    cursor.setPosition(0, cursor.getRow() + 1);
-                } else {
-                    scrollUp();
-                    cursor.setPosition(0, cursor.getRow());
-                }
-            }
+        int col = cursor.getColumn();
+        int row = cursor.getRow();
+        int total = col + n;
+
+        if (total < width) {
+            // Stays on the same line — no wrapping
+            cursor.setPosition(total, row);
+            return;
         }
+
+        // Mark current line as soft-wrapped
+        screen[row].setSoftWrapped(true);
+
+        // How many full lines we advance past the current one
+        // (subtract remaining cells on current line, then divide)
+        int remaining = total - width;
+        int lineWraps = 1 + remaining / width;
+        int newCol = remaining % width;
+
+        // Mark intermediate lines as soft-wrapped and scroll if needed
+        for (int w = 1; w < lineWraps; w++) {
+            if (row < height - 1) {
+                row++;
+            } else {
+                scrollUp();
+            }
+            screen[row].setSoftWrapped(true);
+        }
+
+        // Final wrap — move to the next line
+        if (row < height - 1) {
+            row++;
+        } else {
+            scrollUp();
+        }
+
+        cursor.setPosition(newCol, row);
     }
 
     /**

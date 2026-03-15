@@ -40,18 +40,22 @@ public class Cursor {
     }
 
     public void moveUp(int n) {
+        if (n <= 0) return;
         row = clampRow(row - n);
     }
 
     public void moveDown(int n) {
+        if (n <= 0) return;
         row = clampRow(row + n);
     }
 
     public void moveLeft(int n) {
+        if (n <= 0) return;
         column = clampColumn(column - n);
     }
 
     public void moveRight(int n) {
+        if (n <= 0) return;
         column = clampColumn(column + n);
     }
 
