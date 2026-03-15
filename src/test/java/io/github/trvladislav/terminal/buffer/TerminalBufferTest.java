@@ -717,13 +717,11 @@ class TerminalBufferTest {
         // Width 4: "A世 " (soft, space pad at col 3), "界B  " (hard)
         narrow.resize(10, 4);
 
-        // Merged: A + 世 + space + 界 + B (space is real content from padding)
+        // Merged: A + 世 + 界 + B (soft space stripped during reflow)
         assertEquals('A', narrow.getCharacterAt(0, 0));
         assertEquals(0x4E16, narrow.getCharacterAt(1, 0));
-        // col 3 is the space that was placed when 界 didn't fit at last column
-        assertEquals(' ', narrow.getCharacterAt(3, 0));
-        assertEquals(0x754C, narrow.getCharacterAt(4, 0));
-        assertEquals('B', narrow.getCharacterAt(6, 0));
+        assertEquals(0x754C, narrow.getCharacterAt(3, 0));
+        assertEquals('B', narrow.getCharacterAt(5, 0));
     }
 
     @Test
@@ -741,5 +739,54 @@ class TerminalBufferTest {
         assertEquals(4, buf.getScrollbackSize());
         assertEquals('A', buf.getCharacterAt(0, 0));
         assertEquals('F', buf.getCharacterAt(0, 1));
+    }
+
+    // ==================== Soft Space ====================
+
+    @Test
+    void testSoftSpaceCreatedWhenWideCharWraps() {
+        // Width 3: "AB" then 世 → cursor at col 2 (last col), pad + wrap
+        TerminalBuffer b = new TerminalBuffer(3, 3, 5);
+        b.writeText("AB\u4E16"); // A + B + 世
+
+        // Col 2 of row 0 should be a soft space
+        assertTrue(CellUtils.isSoftSpace(b.getScreenCell(2, 0)));
+        // Wide char wraps to row 1
+        assertTrue(CellUtils.isWide(b.getScreenCell(0, 1)));
+        assertEquals(0x4E16, b.getCharacterAt(0, 1));
+    }
+
+    @Test
+    void testSoftSpaceStrippedDuringReflow() {
+        // Width 3: "AB世" → "AB[soft]"(soft) + "世[cont] "(hard)
+        TerminalBuffer b = new TerminalBuffer(3, 3, 5);
+        b.writeText("AB\u4E16");
+
+        assertTrue(CellUtils.isSoftSpace(b.getScreenCell(2, 0)));
+
+        // Resize wider — soft space should disappear, "AB世" on one line
+        b.resize(10, 3);
+
+        assertEquals('A', b.getCharacterAt(0, 0));
+        assertEquals('B', b.getCharacterAt(1, 0));
+        assertEquals(0x4E16, b.getCharacterAt(2, 0));
+        // Col 4 is regular empty, not soft space
+        assertFalse(CellUtils.isSoftSpace(b.getScreenCell(4, 0)));
+    }
+
+    @Test
+    void testSoftSpaceRoundTrip() {
+        // Narrow → wide → narrow: soft spaces don't accumulate
+        // Use enough height so lines don't overflow to scrollback
+        TerminalBuffer b = new TerminalBuffer(3, 5, 5);
+        b.writeText("AB\u4E16");
+
+        b.resize(10, 5);  // widen — soft space stripped, "AB世" on one line
+        b.resize(3, 5);   // narrow again — new soft space at col 2
+
+        assertEquals('A', b.getCharacterAt(0, 0));
+        assertEquals('B', b.getCharacterAt(1, 0));
+        assertTrue(CellUtils.isSoftSpace(b.getScreenCell(2, 0)));
+        assertEquals(0x4E16, b.getCharacterAt(0, 1));
     }
 }

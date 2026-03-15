@@ -141,4 +141,27 @@ class CellUtilsTest {
         assertEquals(CellUtils.getForegroundColor(left), CellUtils.getForegroundColor(right));
         assertEquals(CellUtils.getBackgroundColor(left), CellUtils.getBackgroundColor(right));
     }
+
+    // ==================== Soft Space ====================
+
+    @Test
+    void testSoftSpaceFlag() {
+        long soft = CellUtils.createSoftSpace(7, 0, 0);
+        long regular = CellUtils.encode(' ', 7, 0, 0);
+
+        assertTrue(CellUtils.isSoftSpace(soft));
+        assertFalse(CellUtils.isSoftSpace(regular));
+        assertEquals(' ', CellUtils.getCharacter(soft));
+        assertFalse(CellUtils.isWide(soft));
+        assertFalse(CellUtils.isWideContinuation(soft));
+    }
+
+    @Test
+    void testSoftSpacePreservesColors() {
+        long soft = CellUtils.createSoftSpace(10, 3, CellUtils.STYLE_BOLD);
+
+        assertEquals(10, CellUtils.getForegroundColor(soft));
+        assertEquals(3, CellUtils.getBackgroundColor(soft));
+        assertEquals(CellUtils.STYLE_BOLD, CellUtils.getStyles(soft));
+    }
 }

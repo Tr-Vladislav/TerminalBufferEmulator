@@ -10,7 +10,8 @@ package io.github.trvladislav.terminal.cell;
  * [40..47] - Style flags (Bold, Italic, etc.)
  * [48]     - Wide flag (1 = this cell is the left half of a wide character)
  * [49]     - Wide continuation flag (1 = this cell is the right half placeholder)
- * [50..63] - Reserved
+ * [50]     - Soft space flag (1 = padding space inserted before a wrapped wide character)
+ * [51..63] - Reserved
  */
 public final class CellUtils {
 
@@ -36,6 +37,9 @@ public final class CellUtils {
     // Wide character flags (bits 48-49)
     private static final long WIDE_FLAG = 1L << 48;
     private static final long WIDE_CONT_FLAG = 1L << 49;
+
+    // Soft space flag (bit 50) — marks padding spaces inserted when a wide char wraps
+    private static final long SOFT_SPACE_FLAG = 1L << 50;
 
     /**
      * Pre-computed empty cell: space character, default fg/bg, no styles.
@@ -122,6 +126,21 @@ public final class CellUtils {
 
     public static boolean isWideContinuation(long cell) {
         return (cell & WIDE_CONT_FLAG) != 0;
+    }
+
+    // --- Soft Space ---
+
+    /**
+     * Creates a soft space — a padding cell placed at the end of a line when a
+     * wide character doesn't fit. Stripped during reflow so it doesn't become
+     * permanent content.
+     */
+    public static long createSoftSpace(int fgColor, int bgColor, int styles) {
+        return encode(' ', fgColor, bgColor, styles) | SOFT_SPACE_FLAG;
+    }
+
+    public static boolean isSoftSpace(long cell) {
+        return (cell & SOFT_SPACE_FLAG) != 0;
     }
 
     public static int getDisplayWidth(int codePoint) {

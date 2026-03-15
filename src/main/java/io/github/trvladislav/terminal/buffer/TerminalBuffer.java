@@ -180,7 +180,7 @@ public class TerminalBuffer {
                 col += 2;
             }
             if (col < width) {
-                line.write(col, CellUtils.encode(' ', currentFg, currentBg, currentStyles));
+                line.write(col, CellUtils.createSoftSpace(currentFg, currentBg, currentStyles));
             }
         } else {
             long cell = CellUtils.encode(codePoint, currentFg, currentBg, currentStyles);
@@ -343,6 +343,11 @@ public class TerminalBuffer {
         // 1. Collect all physical lines: scrollback + screen
         List<BufferLine> allLines = collectAllLines();
 
+        // 1b. Trim trailing empty lines — they are screen padding, not content
+        while (!allLines.isEmpty() && isEmptyLine(allLines.get(allLines.size() - 1))) {
+            allLines.remove(allLines.size() - 1);
+        }
+
         // 2. Group into logical lines and re-wrap to new width
         List<BufferLine> reflowed = reflow(allLines, newWidth);
 
@@ -444,12 +449,23 @@ public class TerminalBuffer {
     }
 
     /**
-     * Returns the index of the last non-empty cell + 1.
+     * Returns true if all cells in the line are empty.
+     */
+    private boolean isEmptyLine(BufferLine line) {
+        long[] cells = (line instanceof Line l) ? l.getCellsDirect() : line.getCells();
+        for (long cell : cells) {
+            if (cell != CellUtils.EMPTY_CELL) return false;
+        }
+        return true;
+    }
+
+    /**
+     * Returns the index of the last non-empty, non-soft-space cell + 1.
      */
     private int trimTrailingEmpty(long[] cells) {
-        long emptyCell = CellUtils.EMPTY_CELL;
         int length = cells.length;
-        while (length > 0 && cells[length - 1] == emptyCell) {
+        while (length > 0 && (cells[length - 1] == CellUtils.EMPTY_CELL
+                || CellUtils.isSoftSpace(cells[length - 1]))) {
             length--;
         }
         return length;
@@ -474,12 +490,13 @@ public class TerminalBuffer {
         for (int c = 0; c < contentLength; c++) {
             long cell = logicalCells[c];
             if (CellUtils.isWideContinuation(cell)) continue;
+            if (CellUtils.isSoftSpace(cell)) continue;
 
             int cellWidth = CellUtils.isWide(cell) ? 2 : 1;
 
-            // Wide char at last column — pad with space and soft-wrap
+            // Wide char at last column — pad with soft space and soft-wrap
             if (cellWidth == 2 && col == newWidth - 1) {
-                lineCells[col] = CellUtils.encode(' ',
+                lineCells[col] = CellUtils.createSoftSpace(
                         CellUtils.getForegroundColor(cell),
                         CellUtils.getBackgroundColor(cell),
                         CellUtils.getStyles(cell));
@@ -512,11 +529,12 @@ public class TerminalBuffer {
     }
 
     /**
-     * Returns true if there are non-continuation cells remaining after fromIndex.
+     * Returns true if there are real content cells remaining after fromIndex.
      */
     private boolean hasMoreContent(long[] cells, int fromIndex, int contentLength) {
         for (int i = fromIndex; i < contentLength; i++) {
-            if (!CellUtils.isWideContinuation(cells[i])) return true;
+            if (!CellUtils.isWideContinuation(cells[i]) && !CellUtils.isSoftSpace(cells[i]))
+                return true;
         }
         return false;
     }
@@ -545,7 +563,7 @@ public class TerminalBuffer {
                 // Wide char needs 2 cells — if at last column, pad and wrap first
                 if (cursor.getColumn() == width - 1) {
                     screen[cursor.getRow()].write(cursor.getColumn(),
-                            CellUtils.encode(' ', currentFg, currentBg, currentStyles));
+                            CellUtils.createSoftSpace(currentFg, currentBg, currentStyles));
                     advanceCursor(1);
                 }
                 long cell = CellUtils.encodeWide(codePoint, currentFg, currentBg, currentStyles);
