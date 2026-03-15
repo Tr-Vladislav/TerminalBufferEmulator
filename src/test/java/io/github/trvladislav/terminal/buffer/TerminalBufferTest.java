@@ -68,6 +68,18 @@ class TerminalBufferTest {
     }
 
     @Test
+    void testAttributesAppliedToInsert() {
+        buf.setAttributes(14, 6, CellUtils.STYLE_UNDERLINE);
+        buf.insertText("Z");
+
+        long cell = buf.getScreenCell(0, 0);
+        assertEquals('Z', CellUtils.getCharacter(cell));
+        assertEquals(14, CellUtils.getForegroundColor(cell));
+        assertEquals(6, CellUtils.getBackgroundColor(cell));
+        assertTrue(CellUtils.isUnderline(cell));
+    }
+
+    @Test
     void testSetAttributesValidation() {
         // negative values
         assertThrows(IllegalArgumentException.class, () -> buf.setAttributes(-1, 0, 0));
@@ -326,21 +338,16 @@ class TerminalBufferTest {
         buf.writeText("DATA");
         buf.insertLineAtBottom();
         buf.insertLineAtBottom();
+        assertTrue(buf.getScrollbackSize() > 0, "Precondition: scrollback should not be empty");
 
         buf.clearAll();
 
         assertEquals(0, buf.getCursorColumn());
         assertEquals(0, buf.getCursorRow());
+        assertEquals(0, buf.getScrollbackSize());
         for (int r = 0; r < HEIGHT; r++) {
             for (int c = 0; c < WIDTH; c++) {
                 assertEquals(' ', buf.getCharacterAt(c, r));
-            }
-        }
-        // Scrollback lines should be cleared (replaced with empty)
-        for (int i = 0; i < buf.getScrollbackSize(); i++) {
-            for (int c = 0; c < WIDTH; c++) {
-                assertEquals(' ', CellUtils.getCharacter(
-                        buf.getScrollbackCell(c, i)));
             }
         }
     }
