@@ -16,6 +16,12 @@ public class Line implements BufferLine {
         Arrays.fill(cells, CellUtils.createEmpty());
     }
 
+    Line(long[] cells, boolean softWrapped) {
+        this.width = cells.length;
+        this.cells = cells;
+        this.softWrapped = softWrapped;
+    }
+
     /**
      * Overwrites content at the given position.
      * If cellData is wide and there is room for 2 cells, writes both.
@@ -92,6 +98,10 @@ public class Line implements BufferLine {
     public long getCell(int column) {
         checkBounds(column);
         return cells[column];
+    }
+
+    public long[] getCells() {
+        return Arrays.copyOf(cells, width);
     }
 
     public int getWidth() {

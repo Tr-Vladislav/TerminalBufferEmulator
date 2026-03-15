@@ -16,6 +16,8 @@ public interface BufferLine {
 
     long getCell(int column);
 
+    long[] getCells();
+
     int getWidth();
 
     boolean isSoftWrapped();

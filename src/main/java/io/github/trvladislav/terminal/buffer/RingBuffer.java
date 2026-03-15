@@ -1,5 +1,8 @@
 package io.github.trvladislav.terminal.buffer;
 
+import java.util.ArrayList;
+import java.util.List;
+
 class RingBuffer {
 
     private final BufferLine[] buffer;
@@ -61,6 +64,17 @@ class RingBuffer {
 
     public boolean isFull() {
         return size == capacity;
+    }
+
+    /**
+     * Returns all lines in logical order (oldest first).
+     */
+    public List<BufferLine> toList() {
+        List<BufferLine> result = new ArrayList<>(size);
+        for (int i = 0; i < size; i++) {
+            result.add(get(i));
+        }
+        return result;
     }
 
     /**
