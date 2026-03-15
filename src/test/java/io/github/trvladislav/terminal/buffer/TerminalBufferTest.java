@@ -240,6 +240,87 @@ class TerminalBufferTest {
         assertEquals('D', buf.getCharacterAt(1, 1));
     }
 
+    // ==================== Wide Characters ====================
+
+    @Test
+    void testWriteWideChar() {
+        buf.writeText("\u4E16"); // 世 — wide CJK character
+
+        assertTrue(CellUtils.isWide(buf.getScreenCell(0, 0)));
+        assertEquals(0x4E16, buf.getCharacterAt(0, 0));
+        assertTrue(CellUtils.isWideContinuation(buf.getScreenCell(1, 0)));
+        assertEquals(2, buf.getCursorColumn());
+    }
+
+    @Test
+    void testWriteWideCharAtLastColumnWraps() {
+        buf.setCursorPosition(WIDTH - 1, 0);
+        buf.writeText("\u4E16"); // 世
+
+        // Last column should get a space, wide char wraps to next row
+        assertEquals(' ', buf.getCharacterAt(WIDTH - 1, 0));
+        assertTrue(CellUtils.isWide(buf.getScreenCell(0, 1)));
+        assertEquals(0x4E16, buf.getCharacterAt(0, 1));
+        assertTrue(CellUtils.isWideContinuation(buf.getScreenCell(1, 1)));
+    }
+
+    @Test
+    void testWriteMixedNarrowAndWide() {
+        buf.writeText("A\u4E16B"); // A + 世 + B
+
+        assertEquals('A', buf.getCharacterAt(0, 0));
+        assertEquals(0x4E16, buf.getCharacterAt(1, 0));
+        assertTrue(CellUtils.isWideContinuation(buf.getScreenCell(2, 0)));
+        assertEquals('B', buf.getCharacterAt(3, 0));
+        assertEquals(4, buf.getCursorColumn());
+    }
+
+    @Test
+    void testInsertWideChar() {
+        buf.writeText("AB");
+        buf.setCursorPosition(1, 0);
+        buf.insertText("\u4E16"); // 世
+
+        assertEquals('A', buf.getCharacterAt(0, 0));
+        assertTrue(CellUtils.isWide(buf.getScreenCell(1, 0)));
+        assertTrue(CellUtils.isWideContinuation(buf.getScreenCell(2, 0)));
+        assertEquals('B', buf.getCharacterAt(3, 0));
+    }
+
+    @Test
+    void testWriteWideCharScrollsAtBottom() {
+        buf.setCursorPosition(WIDTH - 1, HEIGHT - 1);
+        buf.writeText("\u4E16"); // 世
+
+        // Space at last column triggers wrap, which triggers scroll
+        assertEquals(1, buf.getScrollbackSize());
+        assertTrue(CellUtils.isWide(buf.getScreenCell(0, HEIGHT - 1)));
+    }
+
+    @Test
+    void testFillLineWithWideChar() {
+        buf.fillLine(0x4E16); // 世
+
+        // WIDTH=10, so 5 wide chars fit (columns 0-1, 2-3, 4-5, 6-7, 8-9)
+        for (int col = 0; col < WIDTH; col += 2) {
+            assertTrue(CellUtils.isWide(buf.getScreenCell(col, 0)));
+            assertTrue(CellUtils.isWideContinuation(buf.getScreenCell(col + 1, 0)));
+        }
+    }
+
+    @Test
+    void testFillLineWithWideCharOddWidth() {
+        TerminalBuffer oddBuf = new TerminalBuffer(9, 4, 5);
+        oddBuf.fillLine(0x4E16); // 世
+
+        // 4 wide chars (cols 0-7), last column gets a space
+        for (int col = 0; col < 8; col += 2) {
+            assertTrue(CellUtils.isWide(oddBuf.getScreenCell(col, 0)));
+        }
+        assertEquals(' ', oddBuf.getCharacterAt(8, 0));
+        assertFalse(CellUtils.isWide(oddBuf.getScreenCell(8, 0)));
+    }
+
     // ==================== fillLine ====================
 
     @Test
