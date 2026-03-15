@@ -101,4 +101,42 @@ class CellUtilsTest {
         assertEquals(20, CellUtils.getBackgroundColor(modified));
         assertEquals(CellUtils.STYLE_ITALIC | CellUtils.STYLE_UNDERLINE, CellUtils.getStyles(modified));
     }
+
+    // ==================== Wide Characters ====================
+
+    @Test
+    void testWideAndContinuationFlags() {
+        long wide = CellUtils.encodeWide(0x4E16, 7, 0, 0); // 世
+        long cont = CellUtils.createWideContinuation(7, 0, 0);
+        long regular = CellUtils.encode('A', 7, 0, 0);
+
+        assertTrue(CellUtils.isWide(wide));
+        assertFalse(CellUtils.isWideContinuation(wide));
+
+        assertTrue(CellUtils.isWideContinuation(cont));
+        assertFalse(CellUtils.isWide(cont));
+
+        assertFalse(CellUtils.isWide(regular));
+        assertFalse(CellUtils.isWideContinuation(regular));
+    }
+
+    @Test
+    void testDisplayWidth() {
+        assertEquals(1, CellUtils.getDisplayWidth('A'));
+        assertEquals(2, CellUtils.getDisplayWidth(0x4E16));  // 世 (CJK)
+        assertEquals(2, CellUtils.getDisplayWidth(0x1F680)); // 🚀 (emoji)
+        assertEquals(2, CellUtils.getDisplayWidth(0x3042));  // あ (Hiragana)
+        assertEquals(1, CellUtils.getDisplayWidth(0x00E9));  // é (Latin)
+    }
+
+    @Test
+    void testWideCharPairStorage() {
+        long left = CellUtils.encodeWide(0x4E16, 10, 3, CellUtils.STYLE_BOLD);
+        long right = CellUtils.createWideContinuation(10, 3, CellUtils.STYLE_BOLD);
+
+        assertEquals(0x4E16, CellUtils.getCharacter(left));
+        assertEquals(' ', CellUtils.getCharacter(right));
+        assertEquals(CellUtils.getForegroundColor(left), CellUtils.getForegroundColor(right));
+        assertEquals(CellUtils.getBackgroundColor(left), CellUtils.getBackgroundColor(right));
+    }
 }
