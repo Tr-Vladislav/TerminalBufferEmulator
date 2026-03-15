@@ -67,6 +67,54 @@ class TerminalBufferTest {
         assertTrue(CellUtils.isItalic(cell));
     }
 
+    @Test
+    void testSetAttributesValidation() {
+        // negative values
+        assertThrows(IllegalArgumentException.class, () -> buf.setAttributes(-1, 0, 0));
+        assertThrows(IllegalArgumentException.class, () -> buf.setAttributes(0, -1, 0));
+        assertThrows(IllegalArgumentException.class, () -> buf.setAttributes(0, 0, -1));
+        // over max color
+        assertThrows(IllegalArgumentException.class, () -> buf.setAttributes(256, 0, 0));
+        assertThrows(IllegalArgumentException.class, () -> buf.setAttributes(0, 256, 0));
+        // over max styles
+        assertThrows(IllegalArgumentException.class, () -> buf.setAttributes(0, 0, 8));
+    }
+
+    @Test
+    void testSetAttributesBoundaryValues() {
+        // max valid values
+        assertDoesNotThrow(() -> buf.setAttributes(255, 255, 7));
+        assertEquals(255, buf.getCurrentFg());
+        assertEquals(255, buf.getCurrentBg());
+        assertEquals(7, buf.getCurrentStyles());
+        // min valid values
+        assertDoesNotThrow(() -> buf.setAttributes(0, 0, 0));
+        assertEquals(0, buf.getCurrentFg());
+        assertEquals(0, buf.getCurrentBg());
+        assertEquals(0, buf.getCurrentStyles());
+    }
+
+    @Test
+    void testSetForegroundValidation() {
+        assertThrows(IllegalArgumentException.class, () -> buf.setForeground(-1));
+        assertThrows(IllegalArgumentException.class, () -> buf.setForeground(256));
+        assertDoesNotThrow(() -> buf.setForeground(255));
+    }
+
+    @Test
+    void testSetBackgroundValidation() {
+        assertThrows(IllegalArgumentException.class, () -> buf.setBackground(-1));
+        assertThrows(IllegalArgumentException.class, () -> buf.setBackground(256));
+        assertDoesNotThrow(() -> buf.setBackground(255));
+    }
+
+    @Test
+    void testSetStylesValidation() {
+        assertThrows(IllegalArgumentException.class, () -> buf.setStyles(-1));
+        assertThrows(IllegalArgumentException.class, () -> buf.setStyles(8));
+        assertDoesNotThrow(() -> buf.setStyles(7));
+    }
+
     // ==================== Cursor ====================
 
     @Test

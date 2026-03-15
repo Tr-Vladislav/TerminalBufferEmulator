@@ -51,6 +51,9 @@ public class TerminalBuffer {
     // ==================== Attributes ====================
 
     public void setAttributes(int fg, int bg, int styles) {
+        validateColorRange(fg);
+        validateColorRange(bg);
+        validateStyleRange(styles);
         this.currentFg = fg;
         this.currentBg = bg;
         this.currentStyles = styles;
@@ -66,6 +69,7 @@ public class TerminalBuffer {
     }
 
     public void setForeground(int fg) {
+        validateColorRange(fg);
         this.currentFg = fg;
     }
 
@@ -74,6 +78,7 @@ public class TerminalBuffer {
     }
 
     public void setBackground(int bg) {
+        validateColorRange(bg);
         this.currentBg = bg;
     }
 
@@ -82,6 +87,7 @@ public class TerminalBuffer {
     }
 
     public void setStyles(int styles) {
+        validateStyleRange(styles);
         this.currentStyles = styles;
     }
 
@@ -336,6 +342,20 @@ public class TerminalBuffer {
         scrollback.push(screen[0]);
         System.arraycopy(screen, 1, screen, 0, height - 1);
         screen[height - 1] = new Line(width);
+    }
+
+    private void validateColorRange(int color) {
+        if (color < 0 || color > 255) {
+            throw new IllegalArgumentException(
+                    "Color must be 0-255, got: " + color);
+        }
+    }
+
+    private void validateStyleRange(int styles) {
+        if (styles < 0 || styles > 7) {
+            throw new IllegalArgumentException(
+                    "Styles must be 0-7, got: " + styles);
+        }
     }
 
     private void checkScreenBounds(int column, int row) {
