@@ -7,10 +7,12 @@ import java.util.Arrays;
 public class Line implements BufferLine {
     private final long[] cells;
     private final int width;
+    private boolean softWrapped;
 
     Line(int width) {
         this.width = width;
         this.cells = new long[width];
+        this.softWrapped = false;
         Arrays.fill(cells, CellUtils.createEmpty());
     }
 
@@ -84,6 +86,7 @@ public class Line implements BufferLine {
      */
     public void clear() {
         Arrays.fill(cells, CellUtils.createEmpty());
+        this.softWrapped = false;
     }
 
     public long getCell(int column) {
@@ -93,6 +96,14 @@ public class Line implements BufferLine {
 
     public int getWidth() {
         return width;
+    }
+
+    public boolean isSoftWrapped() {
+        return softWrapped;
+    }
+
+    public void setSoftWrapped(boolean softWrapped) {
+        this.softWrapped = softWrapped;
     }
 
     @Override

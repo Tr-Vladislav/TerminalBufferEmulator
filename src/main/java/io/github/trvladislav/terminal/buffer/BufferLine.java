@@ -18,5 +18,9 @@ public interface BufferLine {
 
     int getWidth();
 
+    boolean isSoftWrapped();
+
+    void setSoftWrapped(boolean softWrapped);
+
     void appendTo(StringBuilder sb);
 }
