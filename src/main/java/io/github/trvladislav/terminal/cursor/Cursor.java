@@ -55,14 +55,6 @@ public class Cursor {
         column = clampColumn(column + n);
     }
 
-    public int getScreenWidth() {
-        return screenWidth;
-    }
-
-    public int getScreenHeight() {
-        return screenHeight;
-    }
-
     private int clampColumn(int col) {
         return Math.max(0, Math.min(col, screenWidth - 1));
     }

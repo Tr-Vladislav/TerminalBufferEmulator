@@ -37,7 +37,7 @@ public class TerminalBuffer {
         this.height = height;
         this.cursor = new Cursor(width, height);
         this.screen = new BufferLine[height];
-        this.scrollback = new RingBuffer(Math.max(maxScrollback, 1));
+        this.scrollback = new RingBuffer(Math.max(maxScrollback, 0));
 
         for (int i = 0; i < height; i++) {
             screen[i] = new Line(width);
@@ -145,15 +145,7 @@ public class TerminalBuffer {
             long cell = CellUtils.encode(codePoint, currentFg, currentBg, currentStyles);
 
             screen[cursor.getRow()].write(cursor.getColumn(), cell);
-
-            if (cursor.getColumn() < width - 1) {
-                cursor.setPosition(cursor.getColumn() + 1, cursor.getRow());
-            } else if (cursor.getRow() < height - 1) {
-                cursor.setPosition(0, cursor.getRow() + 1);
-            } else {
-                scrollUp();
-                cursor.setPosition(0, cursor.getRow());
-            }
+            advanceCursor();
 
             i += Character.charCount(codePoint);
         }
@@ -171,15 +163,7 @@ public class TerminalBuffer {
             long cell = CellUtils.encode(codePoint, currentFg, currentBg, currentStyles);
 
             screen[cursor.getRow()].insert(cursor.getColumn(), cell);
-
-            if (cursor.getColumn() < width - 1) {
-                cursor.setPosition(cursor.getColumn() + 1, cursor.getRow());
-            } else if (cursor.getRow() < height - 1) {
-                cursor.setPosition(0, cursor.getRow() + 1);
-            } else {
-                scrollUp();
-                cursor.setPosition(0, cursor.getRow());
-            }
+            advanceCursor();
 
             i += Character.charCount(codePoint);
         }
@@ -328,6 +312,21 @@ public class TerminalBuffer {
     }
 
     // ==================== Internal ====================
+
+    /**
+     * Advances the cursor by one position: moves right within the line,
+     * wraps to the next line at the right edge, or scrolls up at the bottom.
+     */
+    private void advanceCursor() {
+        if (cursor.getColumn() < width - 1) {
+            cursor.setPosition(cursor.getColumn() + 1, cursor.getRow());
+        } else if (cursor.getRow() < height - 1) {
+            cursor.setPosition(0, cursor.getRow() + 1);
+        } else {
+            scrollUp();
+            cursor.setPosition(0, cursor.getRow());
+        }
+    }
 
     /**
      * Pushes the top screen line into scrollback, shifts all screen lines up,
