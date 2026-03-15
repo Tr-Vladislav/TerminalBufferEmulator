@@ -8,7 +8,9 @@ package io.github.trvladislav.terminal.cell;
  * [24..31] - Foreground Color (0-255)
  * [32..39] - Background Color (0-255)
  * [40..47] - Style flags (Bold, Italic, etc.)
- * [48..63] - Reserved (e.g., for wide character flags)
+ * [48]     - Wide flag (1 = this cell is the left half of a wide character)
+ * [49]     - Wide continuation flag (1 = this cell is the right half placeholder)
+ * [50..63] - Reserved
  */
 public final class CellUtils {
 
@@ -30,6 +32,10 @@ public final class CellUtils {
     public static final int STYLE_BOLD = 1;
     public static final int STYLE_ITALIC = 2;
     public static final int STYLE_UNDERLINE = 4;
+
+    // Wide character flags (bits 48-49)
+    private static final long WIDE_FLAG = 1L << 48;
+    private static final long WIDE_CONT_FLAG = 1L << 49;
 
     private CellUtils() {
     }
@@ -69,6 +75,21 @@ public final class CellUtils {
         return (int) ((cell >>> STYLE_SHIFT) & BYTE_MASK);
     }
 
+    /**
+     * Packs a wide character into a cell with the wide flag set.
+     */
+    public static long encodeWide(int character, int fgColor, int bgColor, int styles) {
+        return encode(character, fgColor, bgColor, styles) | WIDE_FLAG;
+    }
+
+    /**
+     * Creates a wide continuation cell (right half placeholder).
+     * Carries the same colors and styles as the left half for consistent rendering.
+     */
+    public static long createWideContinuation(int fgColor, int bgColor, int styles) {
+        return encode(' ', fgColor, bgColor, styles) | WIDE_CONT_FLAG;
+    }
+
     // --- Style Checkers ---
 
     public static boolean isBold(long cell) {
@@ -81,6 +102,21 @@ public final class CellUtils {
 
     public static boolean isUnderline(long cell) {
         return (getStyles(cell) & STYLE_UNDERLINE) != 0;
+    }
+
+    // --- Wide Character Checkers ---
+
+    public static boolean isWide(long cell) {
+        return (cell & WIDE_FLAG) != 0;
+    }
+
+    public static boolean isWideContinuation(long cell) {
+        return (cell & WIDE_CONT_FLAG) != 0;
+    }
+
+    public static int getDisplayWidth(int codePoint) {
+        //TODO: check ranges of wide characters
+        return 1;
     }
 
     // --- Modifiers ---
