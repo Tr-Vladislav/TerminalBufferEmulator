@@ -115,7 +115,45 @@ public final class CellUtils {
     }
 
     public static int getDisplayWidth(int codePoint) {
-        //TODO: check ranges of wide characters
+        // Fast path: ASCII and Latin — vast majority of input
+        if (codePoint < 0x1100) return 1;
+
+        // Hangul Jamo
+        if (codePoint >= 0x1100 && codePoint <= 0x115F) return 2;
+
+        // Angle brackets
+        if (codePoint >= 0x2329 && codePoint <= 0x232A) return 2;
+
+        // CJK and related (0x3000–0xD7AF)
+        if (codePoint >= 0x3000 && codePoint <= 0xD7AF) {
+            if (codePoint <= 0x303F) return 2;   // CJK Symbols and Punctuation
+            if (codePoint <= 0x309F) return 2;   // Hiragana
+            if (codePoint <= 0x30FF) return 2;   // Katakana
+            if (codePoint <= 0x312F) return 2;   // Bopomofo
+            if (codePoint >= 0x31F0 && codePoint <= 0x31FF) return 2; // Katakana Phonetic Extensions
+            if (codePoint >= 0x3400 && codePoint <= 0x4DBF) return 2; // CJK Extension A
+            if (codePoint >= 0x4E00 && codePoint <= 0x9FFF) return 2; // CJK Unified Ideographs
+            if (codePoint >= 0xAC00 && codePoint <= 0xD7AF) return 2; // Hangul Syllables
+            return 1;
+        }
+
+        // CJK Compatibility Ideographs
+        if (codePoint >= 0xF900 && codePoint <= 0xFAFF) return 2;
+
+        // Fullwidth forms
+        if (codePoint >= 0xFF01 && codePoint <= 0xFF60) return 2;
+        if (codePoint >= 0xFFE0 && codePoint <= 0xFFE6) return 2;
+
+        // Supplementary CJK
+        if (codePoint >= 0x20000 && codePoint <= 0x2A6DF) return 2; // CJK Extension B
+        if (codePoint >= 0x2A700 && codePoint <= 0x2CEAF) return 2; // CJK Extensions C-F
+        if (codePoint >= 0x30000 && codePoint <= 0x323AF) return 2; // CJK Extensions G-I
+
+        // Emoji ranges
+        if (codePoint >= 0x1F300 && codePoint <= 0x1F9FF) return 2; // Misc Symbols, Emoticons
+        if (codePoint >= 0x1FA00 && codePoint <= 0x1FAFF) return 2; // Extended Symbols and Pictographs
+        if (codePoint >= 0x2600 && codePoint <= 0x27BF) return 2;   // Misc Symbols, Dingbats
+
         return 1;
     }
 
