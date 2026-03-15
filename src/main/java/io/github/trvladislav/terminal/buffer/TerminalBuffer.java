@@ -367,11 +367,14 @@ public class TerminalBuffer {
         for (int step = 0; step < n; step++) {
             if (cursor.getColumn() < width - 1) {
                 cursor.setPosition(cursor.getColumn() + 1, cursor.getRow());
-            } else if (cursor.getRow() < height - 1) {
-                cursor.setPosition(0, cursor.getRow() + 1);
             } else {
-                scrollUp();
-                cursor.setPosition(0, cursor.getRow());
+                screen[cursor.getRow()].setSoftWrapped(true);
+                if (cursor.getRow() < height - 1) {
+                    cursor.setPosition(0, cursor.getRow() + 1);
+                } else {
+                    scrollUp();
+                    cursor.setPosition(0, cursor.getRow());
+                }
             }
         }
     }
