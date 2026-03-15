@@ -37,7 +37,7 @@ public class TerminalBuffer {
         this.height = height;
         this.cursor = new Cursor(width, height);
         this.screen = new BufferLine[height];
-        this.scrollback = new RingBuffer(Math.max(maxScrollback, 0));
+        this.scrollback = new RingBuffer(maxScrollback);
 
         for (int i = 0; i < height; i++) {
             screen[i] = new Line(width);

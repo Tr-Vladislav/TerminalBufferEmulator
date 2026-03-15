@@ -12,8 +12,8 @@ class RingBuffer {
     private int size;
 
     RingBuffer(int capacity) {
-        if (capacity <= 0) {
-            throw new IllegalArgumentException("Capacity must be greater than 0");
+        if (capacity < 0) {
+            throw new IllegalArgumentException("Capacity must be not negative");
         }
         this.capacity = capacity;
         this.buffer = new BufferLine[capacity];
@@ -26,6 +26,8 @@ class RingBuffer {
      * the oldest line is overwritten.
      */
     public void push(BufferLine line) {
+        if (capacity == 0) return;
+
         int tail = (head + size) % capacity;
         buffer[tail] = line;
 

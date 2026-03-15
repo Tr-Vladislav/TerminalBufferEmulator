@@ -34,8 +34,28 @@ class RingBufferTest {
 
     @Test
     void testInvalidCapacityThrowsException() {
-        assertThrows(IllegalArgumentException.class, () -> new RingBuffer(0));
         assertThrows(IllegalArgumentException.class, () -> new RingBuffer(-5));
+    }
+
+    @Test
+    void testZeroCapacity() {
+        RingBuffer zero = new RingBuffer(0);
+
+        assertEquals(0, zero.capacity());
+        assertEquals(0, zero.size());
+        assertTrue(zero.isFull());
+
+        // push is silently ignored
+        zero.push(createLine('A'));
+        zero.push(createLine('B'));
+        assertEquals(0, zero.size());
+
+        // get throws for any index
+        assertThrows(IndexOutOfBoundsException.class, () -> zero.get(0));
+
+        // clear is safe
+        assertDoesNotThrow(zero::clear);
+        assertEquals(0, zero.size());
     }
 
     @Test
