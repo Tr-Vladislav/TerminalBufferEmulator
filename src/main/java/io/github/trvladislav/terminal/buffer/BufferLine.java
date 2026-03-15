@@ -17,4 +17,6 @@ public interface BufferLine {
     long getCell(int column);
 
     int getWidth();
+
+    void appendTo(StringBuilder sb);
 }

@@ -59,11 +59,16 @@ public class Line implements BufferLine {
     }
 
     @Override
-    public String toString() {
-        StringBuilder sb = new StringBuilder(width);
+    public void appendTo(StringBuilder sb) {
         for (long cell : cells) {
             sb.appendCodePoint(CellUtils.getCharacter(cell));
         }
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder(width);
+        appendTo(sb);
         return sb.toString();
     }
 

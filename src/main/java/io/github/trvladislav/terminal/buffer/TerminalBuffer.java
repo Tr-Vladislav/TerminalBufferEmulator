@@ -273,10 +273,10 @@ public class TerminalBuffer {
      * Returns the entire visible screen as a multi-line string.
      */
     public String getScreenContent() {
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder(width * height + height);
         for (int r = 0; r < height; r++) {
             if (r > 0) sb.append('\n');
-            sb.append(screen[r].toString());
+            screen[r].appendTo(sb);
         }
         return sb.toString();
     }
@@ -286,15 +286,15 @@ public class TerminalBuffer {
      * Scrollback lines appear first (oldest at the top), then screen lines.
      */
     public String getFullContent() {
-        StringBuilder sb = new StringBuilder();
         int scrollbackSize = scrollback.size();
+        StringBuilder sb = new StringBuilder(width * (scrollbackSize + height) + scrollbackSize + height);
         for (int i = 0; i < scrollbackSize; i++) {
-            sb.append(scrollback.get(i).toString());
+            scrollback.get(i).appendTo(sb);
             sb.append('\n');
         }
         for (int r = 0; r < height; r++) {
             if (r > 0) sb.append('\n');
-            sb.append(screen[r].toString());
+            screen[r].appendTo(sb);
         }
         return sb.toString();
     }
